@@ -495,6 +495,7 @@ function ProjectReports({ store }: { store: Store }) {
   const [projectFilter, setProjectFilter] = useState('all')
   const [periodFilter, setPeriodFilter] = useState(currentPeriod)
   const [statusFilter, setStatusFilter] = useState('all')
+  const [reportView, setReportView] = useState<'common-fees' | 'receivables'>('common-fees')
   const periods = [...new Set([...store.charges.map((charge) => charge.period), currentPeriod])].sort((left, right) => periodKey(right) - periodKey(left))
   const [month, year] = periodFilter.split('/')
   const effectiveDate = `${year}-${month}-01`
@@ -557,11 +558,59 @@ function ProjectReports({ store }: { store: Store }) {
   }
 
   return <section className="project-report-print">
+    <div className="report-tabs no-print" role="group" aria-label="เลือกประเภทรายงาน"><button type="button" className={reportView === 'common-fees' ? 'report-tab active' : 'report-tab'} aria-pressed={reportView === 'common-fees'} onClick={() => setReportView('common-fees')}>ค่าส่วนกลางรายเดือน</button><button type="button" className={reportView === 'receivables' ? 'report-tab active' : 'report-tab'} aria-pressed={reportView === 'receivables'} onClick={() => setReportView('receivables')}>ลูกหนี้ค้างชำระ</button></div>
+    {reportView === 'receivables' ? <OverdueReceivablesReport store={store} /> : <>
     <header className="report-print-header"><h2>รายงานค่าส่วนกลางและสถานะรับชำระ</h2><p>{store.projects.find((project) => project.id === Number(projectFilter))?.project_name ?? 'ทุกโครงการ'} · รอบบิล {periodFilter}</p></header>
     <section className="water-filters report-filters no-print"><label>โครงการ<select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">ทุกโครงการ</option>{store.projects.map((project) => <option key={project.id} value={project.id}>{project.project_code} · {project.project_name}</option>)}</select></label><label>รอบบิล<select value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>{periods.map((period) => <option value={period} key={period}>{period}</option>)}</select></label><label>สถานะ<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">ทุกสถานะ</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><div className="report-actions"><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={15} />ส่งออก CSV</button><button className="secondary-button" onClick={() => window.print()}><Printer size={15} />พิมพ์รายงาน</button></div></section>
     <section className="summary-grid report-summary-grid"><article className="summary-card"><p>บ้านในรายงาน</p><strong>{reportRows.length}</strong></article><article className="summary-card"><p>ออกบิลแล้ว</p><strong>{billedRows.length}</strong></article><article className="summary-card"><p>ยอดเรียกเก็บรอบนี้</p><strong>฿ {formatMoney(totalBilled)}</strong></article><article className="summary-card"><p>รับชำระแล้ว</p><strong>฿ {formatMoney(totalPaid)}</strong></article><article className="summary-card"><p>ยอดคงค้าง</p><strong>฿ {formatMoney(totalBalance)}</strong></article></section>
     <section className="module-panel"><div className="module-toolbar"><span>{visibleRows.length} รายการ <small>· รอบบิล {periodFilter}</small></span></div><div className="records-table-wrap"><table className="records-table report-table"><thead><tr><th>บ้าน / แปลง</th><th>ลูกบ้าน</th><th>พื้นที่ดิน</th><th>อัตรา / ตร.ว.</th><th>ค่าส่วนกลาง</th><th>ค่าน้ำ</th><th>ค่าปรับ</th><th>ค้างเดิม</th><th>ยอดเรียกเก็บ</th><th>รับชำระ</th><th>คงค้าง</th><th>สถานะ</th></tr></thead><tbody>{visibleRows.map((row) => <tr key={row.house.id}><td><strong>{row.house.house_no}</strong><small className="date-cell">{row.house.plot_no}</small></td><td>{person(row.member)}</td><td>{new Intl.NumberFormat('th-TH', { maximumFractionDigits: 2 }).format(row.house.land_area)} ตร.ว.</td><td>{row.rate ? `฿ ${formatMoney(row.rate.amount)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.commonFee ?? 0)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.waterAmount)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.penalty)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.arrears)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.billedTotal ?? 0)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.paid)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.balance)}` : '—'}</td><td><span className={`status-pill ${row.status === 'PAID' ? 'status-good' : row.status === 'OVERDUE' ? 'status-warn' : row.status === 'NOT_BILLED' ? 'status-neutral' : 'status-progress'}`}>{statusLabels[row.status]}</span></td></tr>)}{visibleRows.length === 0 && <tr><td colSpan={12} className="empty-state">ไม่พบรายการในตัวกรองนี้</td></tr>}</tbody></table></div></section>
+    </>}
   </section>
+}
+
+type OverdueReportRow = { charge: Charge; house: House; member?: Member; outstanding: number; paid: number; daysOverdue: number; ageBucket: '1-30' | '31-60' | '61-90' | '90+' }
+
+function OverdueReceivablesReport({ store }: { store: Store }) {
+  const today = new Date().toISOString().slice(0, 10)
+  const [projectFilter, setProjectFilter] = useState('all')
+  const [ageFilter, setAgeFilter] = useState('all')
+  const formatMoney = (value: number) => new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+  const rows: OverdueReportRow[] = store.charges.flatMap((charge) => {
+    if (charge.due_date >= today || (projectFilter !== 'all' && charge.project_id !== Number(projectFilter))) return []
+    const outstanding = chargeBalance(store, charge)
+    if (outstanding <= 0) return []
+    const dueDate = new Date(`${charge.due_date}T00:00:00`)
+    const todayDate = new Date(`${today}T00:00:00`)
+    const daysOverdue = Math.max(1, Math.floor((todayDate.getTime() - dueDate.getTime()) / 86400000))
+    const ageBucket: OverdueReportRow['ageBucket'] = daysOverdue <= 30 ? '1-30' : daysOverdue <= 60 ? '31-60' : daysOverdue <= 90 ? '61-90' : '90+'
+    const house = store.houses.find((item) => item.id === charge.house_id)
+    if (!house) return []
+    return [{ charge, house, member: store.members.find((item) => item.house_id === house.id && item.status === 'ACTIVE'), outstanding, paid: Math.max(0, charge.amount + (charge.water_amount ?? 0) + (charge.penalty_amount ?? 0) - outstanding), daysOverdue, ageBucket }]
+  }).filter((row) => ageFilter === 'all' || row.ageBucket === ageFilter).sort((left, right) => right.daysOverdue - left.daysOverdue || right.outstanding - left.outstanding)
+  const totalOutstanding = rows.reduce((sum, row) => sum + row.outstanding, 0)
+  const bucketTotals: Record<OverdueReportRow['ageBucket'], number> = { '1-30': 0, '31-60': 0, '61-90': 0, '90+': 0 }
+  for (const row of rows) bucketTotals[row.ageBucket] += row.outstanding
+  const projectName = store.projects.find((project) => project.id === Number(projectFilter))?.project_name ?? 'ทุกโครงการ'
+  const ageLabels: Record<OverdueReportRow['ageBucket'], string> = { '1-30': '1–30 วัน', '31-60': '31–60 วัน', '61-90': '61–90 วัน', '90+': 'เกิน 90 วัน' }
+
+  function exportCsv() {
+    const header = ['บ้านเลขที่', 'แปลง', 'ลูกบ้าน', 'โทรศัพท์', 'เลขที่ใบแจ้งหนี้', 'รอบบิล', 'วันครบกำหนด', 'เกินกำหนด (วัน)', 'ยอดชำระแล้ว', 'ยอดคงค้าง', 'อายุหนี้']
+    const values = rows.map((row) => [row.house.house_no, row.house.plot_no, person(row.member), row.member?.phone ?? '', row.charge.charge_no, row.charge.period, row.charge.due_date, row.daysOverdue, row.paid, row.outstanding, ageLabels[row.ageBucket]])
+    const csv = [header, ...values].map((record) => record.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `overdue-receivables-${today}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return <>
+    <header className="report-print-header"><h2>รายงานลูกหนี้ค้างชำระ</h2><p>{projectName} · ข้อมูล ณ {today}</p></header>
+    <section className="water-filters report-filters no-print"><label>โครงการ<select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">ทุกโครงการ</option>{store.projects.map((project) => <option key={project.id} value={project.id}>{project.project_code} · {project.project_name}</option>)}</select></label><label>อายุหนี้<select value={ageFilter} onChange={(event) => setAgeFilter(event.target.value)}><option value="all">ทุกช่วงอายุ</option><option value="1-30">1–30 วัน</option><option value="31-60">31–60 วัน</option><option value="61-90">61–90 วัน</option><option value="90+">เกิน 90 วัน</option></select></label><div className="report-actions"><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={15} />ส่งออก CSV</button><button className="secondary-button" onClick={() => window.print()}><Printer size={15} />พิมพ์รายงาน</button></div></section>
+    <section className="summary-grid report-summary-grid"><article className="summary-card"><p>ใบแจ้งหนี้ค้างชำระ</p><strong>{rows.length}</strong></article><article className="summary-card"><p>ยอดค้างรวม</p><strong>฿ {formatMoney(totalOutstanding)}</strong></article>{(Object.keys(ageLabels) as OverdueReportRow['ageBucket'][]).map((bucket) => <article className="summary-card" key={bucket}><p>{ageLabels[bucket]}</p><strong>฿ {formatMoney(bucketTotals[bucket])}</strong></article>)}</section>
+    <section className="module-panel"><div className="module-toolbar"><span>{rows.length} รายการ <small>· ลูกหนี้ค้างชำระ</small></span></div><div className="records-table-wrap"><table className="records-table report-table"><thead><tr><th>บ้าน / แปลง</th><th>ลูกบ้าน</th><th>ใบแจ้งหนี้</th><th>รอบบิล</th><th>ครบกำหนด</th><th>เกินกำหนด</th><th>รับชำระแล้ว</th><th>คงค้าง</th><th>อายุหนี้</th></tr></thead><tbody>{rows.map((row) => <tr key={row.charge.id}><td><strong>{row.house.house_no}</strong><small className="date-cell">{row.house.plot_no}</small></td><td>{person(row.member)}<small className="date-cell">{row.member?.phone ?? ''}</small></td><td>{row.charge.charge_no}</td><td>{row.charge.period}</td><td>{row.charge.due_date}</td><td>{row.daysOverdue} วัน</td><td>฿ {formatMoney(row.paid)}</td><td><strong>฿ {formatMoney(row.outstanding)}</strong></td><td><span className={`status-pill ${row.ageBucket === '90+' ? 'status-warn' : 'status-progress'}`}>{ageLabels[row.ageBucket]}</span></td></tr>)}{rows.length === 0 && <tr><td colSpan={9} className="empty-state">ไม่มีใบแจ้งหนี้ค้างชำระ</td></tr>}</tbody></table></div></section>
+  </>
 }
 
 function Module({ screen, store, query, setQuery, onEdit, onDelete }: { screen: ModuleScreen | 'water' | 'reports'; store: Store; query: string; setQuery: (value: string) => void; onEdit: (id: number) => void; onDelete: (id: number) => void }) {
