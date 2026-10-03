@@ -151,6 +151,10 @@
 .house-range > span { padding-bottom: 9px; color: #839087; font-size: 10px; }
 .house-range > small { grid-column: 1 / -1; margin-top: -3px; color: #89958c; font-size: 9px; }
 .bulk-summary { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+.report-summary-grid { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
+.report-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
+.report-print-header { display: none; }
+.report-table { min-width: 1000px; }
 .bulk-summary > div { display: grid; gap: 4px; padding: 9px 10px; border: 1px solid #e7ece5; border-radius: 5px; background: #f8faf7; }
 .bulk-summary small { color: #89958c; font-size: 9px; }
 .bulk-summary strong { color: #345440; font-size: 15px; }
@@ -202,10 +206,19 @@
 .document-signatures i { width: 52mm; height: 12mm; border-bottom: 1px solid #77837a; }
 .document-signatures small { color: #879189; font-size: 8pt; }
 @page { size: A4; margin: 0; }
+@page report-page { size: A4 landscape; margin: 10mm; }
 @media print {
   html, body, #root { width: 210mm; min-height: 297mm; margin: 0; background: #fff !important; }
   body * { visibility: hidden !important; }
   .print-overlay, .print-document, .print-document * { visibility: visible !important; }
+  .project-report-print, .project-report-print * { visibility: visible !important; }
+  .project-report-print { position: absolute; inset: 0 auto auto 0; width: 100%; padding: 8mm; box-sizing: border-box; background: #fff !important; page: report-page; }
+  .project-report-print .no-print { display: none !important; }
+  .report-print-header { display: block; margin-bottom: 6mm; }
+  .report-print-header h2 { margin: 0 0 2mm; color: #263d34; font-size: 16pt; }
+  .report-print-header p { margin: 0; color: #66736a; font-size: 9pt; }
+  .report-table { min-width: 0; font-size: 8pt; }
+  .report-table th, .report-table td { padding: 5px 6px; }
   .print-overlay { position: absolute; inset: 0; overflow: visible; padding: 0; background: #fff !important; }
   .print-document { position: absolute; inset: 0 auto auto 0; width: 210mm; min-height: 297mm; margin: 0; box-shadow: none; }
   .no-print { display: none !important; }

@@ -14,8 +14,8 @@ type PaymentAllocation = { id: number; payment_id: number; charge_id: number; am
 type InvoiceBreakdown = { current: number; arrears: number; penalty: number; paid: number; totalDue: number }
 type Item = { id: number; title: string; detail: string; status: string; date: string; amount?: number }
 type Store = { projects: Project[]; houses: House[]; members: Member[]; rates: Rate[]; charges: Charge[]; payments: Payment[]; paymentAllocations: PaymentAllocation[]; repairs: Item[]; assets: Item[]; finance: Item[]; announcements: Item[] }
-type Screen = 'dashboard' | 'projects' | 'houses' | 'members' | 'rates' | 'charges' | 'payments' | 'water' | 'repairs' | 'assets' | 'finance' | 'announcements'
-type ModuleScreen = Exclude<Screen, 'dashboard' | 'water'>
+type Screen = 'dashboard' | 'projects' | 'houses' | 'members' | 'rates' | 'charges' | 'payments' | 'water' | 'repairs' | 'assets' | 'finance' | 'announcements' | 'reports'
+type ModuleScreen = Exclude<Screen, 'dashboard' | 'water' | 'reports'>
 type PrintTarget = { kind: 'charge'; record: Charge } | { kind: 'payment'; record: Payment }
 type StoreInspectionData = {
   browser: { href: string; origin: string; protocol: string; hostname: string; port: string }
@@ -70,14 +70,14 @@ const initial: Store = {
   announcements: [{ id: 1, title: 'แจ้งปิดสระว่ายน้ำเพื่อบำรุงรักษา', detail: 'LINE Official · 126 ครัวเรือน', status: 'ส่งแล้ว', date: '27 ก.ย. 2569' }],
 }
 
-const labels: Record<Screen, string> = { dashboard: 'ภาพรวม Dashboard', projects: 'โครงการ', houses: 'บ้าน / แปลง', members: 'ลูกบ้าน', rates: 'อัตราค่าส่วนกลาง', charges: 'ใบแจ้งหนี้', payments: 'รับชำระ', water: 'รายการค่าน้ำ', repairs: 'แจ้งซ่อม / งานบริการ', assets: 'ทรัพย์สินส่วนกลาง', finance: 'รายรับ / รายจ่าย', announcements: 'ประกาศ / LINE' }
+const labels: Record<Screen, string> = { dashboard: 'ภาพรวม Dashboard', projects: 'โครงการ', houses: 'บ้าน / แปลง', members: 'ลูกบ้าน', rates: 'อัตราค่าส่วนกลาง', charges: 'ใบแจ้งหนี้', payments: 'รับชำระ', water: 'รายการค่าน้ำ', repairs: 'แจ้งซ่อม / งานบริการ', assets: 'ทรัพย์สินส่วนกลาง', finance: 'รายรับ / รายจ่าย', announcements: 'ประกาศ / LINE', reports: 'รายงานโครงการ' }
 type NavItem = { key: string; label: string; icon: typeof Home; id?: Screen; phase?: string; action?: 'create-charge'; disabled?: boolean }
 const groups: { label: string; phase: string; items: NavItem[] }[] = [
   { label: 'ข้อมูลหลัก', phase: 'PHASE 1', items: [{ key: 'projects', id: 'projects', label: 'โครงการ', icon: Building2 }, { key: 'houses', id: 'houses', label: 'บ้าน / แปลง', icon: Home }, { key: 'members', id: 'members', label: 'ลูกบ้าน', icon: ClipboardList }, { key: 'rates', id: 'rates', label: 'อัตราค่าส่วนกลาง', icon: Wallet }] },
   { label: 'การเงิน', phase: 'PHASE 1', items: [{ key: 'create-charge', id: 'charges', label: 'สร้างใบเรียกเก็บ', icon: Plus, action: 'create-charge' }, { key: 'charges', id: 'charges', label: 'ใบแจ้งหนี้', icon: FileText }, { key: 'payments', id: 'payments', label: 'รับชำระ', icon: CreditCard }, { key: 'water', id: 'water', label: 'รายการค่าน้ำ', icon: Droplets }, { key: 'receipts', id: 'payments', label: 'ใบเสร็จ', icon: Printer }] },
   { label: 'ขยายระบบ', phase: 'PHASE 2', items: [{ key: 'assets', id: 'assets', label: 'ทรัพย์สินส่วนกลาง', icon: ToolCase }, { key: 'repairs', id: 'repairs', label: 'แจ้งซ่อม / งานบริการ', icon: Wrench }, { key: 'finance', id: 'finance', label: 'รายรับ / รายจ่าย', icon: ArrowDownToLine }] },
   { label: 'การสื่อสาร', phase: 'PHASE 3', items: [{ key: 'announcements', id: 'announcements', label: 'ประกาศ / LINE', icon: MessageCircle, disabled: true }] },
-  { label: 'รายงาน / ตั้งค่า', phase: 'PHASE 4', items: [{ key: 'reports', label: 'รายงานโครงการ', icon: ClipboardList, disabled: true }, { key: 'settings', label: 'ผู้ใช้งาน / สิทธิ์', icon: ShieldCheck, disabled: true }] },
+  { label: 'รายงาน / ตั้งค่า', phase: 'PHASE 4', items: [{ key: 'reports', id: 'reports', label: 'รายงานโครงการ', icon: ClipboardList }, { key: 'settings', label: 'ผู้ใช้งาน / สิทธิ์', icon: ShieldCheck, disabled: true }] },
 ]
 const actionText: Partial<Record<Screen, string>> = { projects: 'เพิ่มโครงการ', houses: 'เพิ่มบ้าน / แปลง', members: 'เพิ่มลูกบ้าน', rates: 'เพิ่มอัตรา', charges: 'สร้างใบเรียกเก็บ', payments: 'บันทึกรับเงิน', repairs: 'เพิ่มงานบริการ', assets: 'เพิ่มทรัพย์สิน', finance: 'เพิ่มรายการบัญชี', announcements: 'สร้างประกาศ' }
 const num = (value: number) => new Intl.NumberFormat('th-TH').format(value)
@@ -216,8 +216,8 @@ function App({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   useEffect(() => localStorage.setItem('baanjai-store', JSON.stringify(store)), [store])
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(''), 3000); return () => clearTimeout(timer) }, [toast])
   const nav = (id: Screen, key: string = id) => { setScreen(id); setActiveNavKey(key); setQuery(''); setMobile(false) }
-  const removeRecord = (targetScreen: ModuleScreen | 'water', id: number) => {
-    if (targetScreen === 'water') return
+  const removeRecord = (targetScreen: ModuleScreen | 'water' | 'reports', id: number) => {
+    if (targetScreen === 'water' || targetScreen === 'reports') return
     setStore((previous) => {
       if (targetScreen === 'charges') {
         const charge = previous.charges.find((item) => item.id === id)
@@ -289,14 +289,14 @@ function App({ user, onSignOut }: { user: User; onSignOut: () => void }) {
     <button type="button" className="primary-button" style={{ position: 'fixed', right: 20, bottom: 68, zIndex: 7, background: '#b14f3f' }} onClick={() => setInvoiceCleanup(readInvoiceCleanupPreview())}><Trash2 size={16} />ล้างข้อมูลทดสอบใบแจ้งหนี้</button>
     <button type="button" className="secondary-button" style={{ position: 'fixed', right: 20, bottom: 20, zIndex: 7 }} onClick={() => setInspectionData(readStoreInspection())}><ClipboardList size={16} />ตรวจสอบข้อมูลระบบ</button>
     <main className="main-area"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobile(true)} aria-label="เปิดเมนู"><Menu size={20} /></button><div className="breadcrumb"><span>โครงการ</span><span>/</span><strong>{labels[screen]}</strong></div><div className="topbar-actions"><label className="role-picker"><ShieldCheck size={15} /><select value={role} onChange={(event) => setRole(event.target.value)}><option>ผู้บริหาร</option><option>เจ้าหน้าที่</option><option>ลูกบ้าน</option></select><ChevronDown size={13} /></label><button className="icon-button" onClick={() => setToast('ไม่มีการแจ้งเตือนใหม่')} aria-label="แจ้งเตือน"><Bell size={18} /></button></div></header>
-      <div className="page-content"><div className="page-heading"><div><p className="eyebrow">{project?.project_name ?? 'โครงการ'} <span>·</span> รอบบัญชี ก.ย. 2569</p><h1>{labels[screen]}</h1><p className="page-description">{screen === 'dashboard' ? 'สรุปข้อมูลหลัก ธุรกรรม และงานของโครงการ' : `จัดการ${labels[screen]}ของโครงการ`}</p></div>{screen !== 'dashboard' && screen !== 'water' && <button className="primary-button" onClick={() => { setEditId(null); if (screen === 'charges') setBulkInvoiceDialog(true); else setDialog(true) }}><Plus size={17} />{actionText[screen]}</button>}</div>
+      <div className="page-content"><div className="page-heading"><div><p className="eyebrow">{project?.project_name ?? 'โครงการ'} <span>·</span> รอบบัญชี ก.ย. 2569</p><h1>{labels[screen]}</h1><p className="page-description">{screen === 'dashboard' ? 'สรุปข้อมูลหลัก ธุรกรรม และงานของโครงการ' : `จัดการ${labels[screen]}ของโครงการ`}</p></div>{screen !== 'dashboard' && screen !== 'water' && screen !== 'reports' && <button className="primary-button" onClick={() => { setEditId(null); if (screen === 'charges') setBulkInvoiceDialog(true); else setDialog(true) }}><Plus size={17} />{actionText[screen]}</button>}</div>
         {screen === 'dashboard' && <SetupFlow store={store} navigate={nav} />}
         {screen === 'dashboard' ? <><section className="summary-grid"><article className="summary-card"><span className="summary-icon green-icon"><Wallet size={18} /></span><p>รับชำระแล้ว</p><strong>฿ {num(totalPaid)}</strong><small>จาก {store.payments.length} รายการรับเงิน</small></article><article className="summary-card"><span className="summary-icon blue-icon"><Home size={18} /></span><p>บ้าน / แปลง</p><strong>{store.houses.length} <em>แปลง</em></strong><small>{store.members.length} ลูกบ้านในระบบ</small></article><article className="summary-card"><span className="summary-icon amber-icon"><FileText size={18} /></span><p>ใบแจ้งหนี้</p><strong>{store.charges.length} <em>รายการ</em></strong><small>{store.charges.filter((charge) => charge.status === 'PAID').length} รายการชำระแล้ว</small></article><article className="summary-card"><span className="summary-icon red-icon"><Bell size={18} /></span><p>เกินกำหนด</p><strong>{overdue.length} <em>รายการ</em></strong><small>ยอดค้าง ฿ {num(overdue.reduce((sum, item) => sum + item.amount, 0))}</small></article></section><section className="dashboard-columns"><article className="content-panel"><div className="panel-heading"><div><h2>ค่าส่วนกลาง</h2><p>อัตราปัจจุบันและสถานะเรียกเก็บ</p></div><button className="text-button" onClick={() => nav('rates')}>จัดการอัตรา <ArrowUpRight size={14} /></button></div><div className="rate-summary"><div><small>อัตราต่อแปลง / เดือน</small><strong>฿ {num(store.rates[0]?.amount ?? 0)}</strong><span>{store.rates[0]?.unit}</span></div><div className="rate-arrow"><ArrowDownToLine size={20} /></div><div><small>ใบแจ้งหนี้ในระบบ</small><strong>{store.charges.length} <em>รายการ</em></strong><span>เรียกเก็บแล้ว {store.charges.filter((charge) => charge.status === 'PAID').length} รายการ</span></div></div><div className="flow-links"><button onClick={() => nav('charges')}><FileText size={16} />การเรียกเก็บ <ArrowUpRight size={14} /></button><button onClick={() => nav('payments')}><CreditCard size={16} />การรับชำระ <ArrowUpRight size={14} /></button></div></article><article className="content-panel"><div className="panel-heading"><div><h2>งานที่ต้องติดตาม</h2><p>สถานะธุรกรรมและงานบริการ</p></div><span className="task-count">{overdue.length + store.repairs.length}</span></div><button className="task-row" onClick={() => nav('charges')}><span className="task-icon task-red"><FileText size={16} /></span><span><strong>บิลเกินกำหนด</strong><small>{overdue.length} รายการ · ฿ {num(overdue.reduce((sum, item) => sum + item.amount, 0))}</small></span><span>›</span></button><button className="task-row" onClick={() => nav('repairs')}><span className="task-icon task-yellow"><Wrench size={16} /></span><span><strong>งานแจ้งซ่อม</strong><small>{store.repairs.length} รายการในระบบ</small></span><span>›</span></button><button className="task-row" onClick={() => nav('announcements')}><span className="task-icon task-blue"><MessageCircle size={16} /></span><span><strong>ประกาศ / LINE</strong><small>{store.announcements.length} ประกาศ</small></span><span>›</span></button></article></section><div className="role-note">มุมมอง{role} <span>·</span> ข้อมูลตัวอย่าง</div></> : <Module screen={screen} store={store} query={query} setQuery={setQuery} onEdit={(id) => { setEditId(id); setDialog(true) }} onDelete={(id) => removeRecord(screen, id)} />}
         <footer className="page-footer"><span>บ้านใจ · ระบบบริหารโครงการบ้านจัดสรร</span><span>ข้อมูลจัดเก็บในอุปกรณ์นี้</span></footer></div>
     </main>
     {inspectionData && <StoreInspectionDialog data={inspectionData} close={() => setInspectionData(null)} />}
     {invoiceCleanup && <InvoiceCleanupDialog preview={invoiceCleanup} close={() => setInvoiceCleanup(null)} confirm={confirmInvoiceCleanup} />}
-    {bulkInvoiceDialog && <BulkInvoiceDialog store={store} close={() => setBulkInvoiceDialog(false)} save={(next, created, skipped, period) => { setStore(next); setBulkInvoiceDialog(false); setScreen('charges'); setActiveNavKey('charges'); setToast(`สร้างใบแจ้งหนี้ ${created} รายการ รอบ ${period}${skipped ? ` · ข้าม ${skipped} รายการ` : ''}`) }} />}{dialog && screen !== 'dashboard' && screen !== 'water' && <EntryDialog screen={screen} store={store} editId={editId} close={() => { setDialog(false); setEditId(null) }} save={(next) => { setStore(next); setDialog(false); setEditId(null); setToast(editId === null ? 'บันทึกรายการแล้ว' : 'บันทึกการแก้ไขแล้ว') }} />}{toast && <div className="toast" role="status"><Check size={16} />{toast}<button onClick={() => setToast('')} aria-label="ปิด"><X size={15} /></button></div>}
+    {bulkInvoiceDialog && <BulkInvoiceDialog store={store} close={() => setBulkInvoiceDialog(false)} save={(next, created, skipped, period) => { setStore(next); setBulkInvoiceDialog(false); setScreen('charges'); setActiveNavKey('charges'); setToast(`สร้างใบแจ้งหนี้ ${created} รายการ รอบ ${period}${skipped ? ` · ข้าม ${skipped} รายการ` : ''}`) }} />}{dialog && screen !== 'dashboard' && screen !== 'water' && screen !== 'reports' && <EntryDialog screen={screen} store={store} editId={editId} close={() => { setDialog(false); setEditId(null) }} save={(next) => { setStore(next); setDialog(false); setEditId(null); setToast(editId === null ? 'บันทึกรายการแล้ว' : 'บันทึกการแก้ไขแล้ว') }} />}{toast && <div className="toast" role="status"><Check size={16} />{toast}<button onClick={() => setToast('')} aria-label="ปิด"><X size={15} /></button></div>}
   </div>
 }
 
@@ -474,8 +474,99 @@ function WaterList({ store }: { store: Store }) {
   return <><section className="water-filters"><label>โครงการ<select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">ทุกโครงการ</option>{store.projects.map((project) => <option key={project.id} value={project.id}>{project.project_code} · {project.project_name}</option>)}</select></label><label>รอบบิล / เดือน<select value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}><option value="all">ทุกเดือน</option>{periods.map((period) => <option key={period} value={period}>{period}</option>)}</select></label><label>สถานะ<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">ทุกสถานะ</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label className="water-house-search">บ้านเลขที่<input type="search" value={houseSearch} onChange={(event) => setHouseSearch(event.target.value)} placeholder="ค้นหาบ้านเลขที่ / แปลง" /></label></section><section className="summary-grid water-summary"><article className="summary-card"><p>จำนวนบ้านทั้งหมด</p><strong>{houseCount}</strong></article><article className="summary-card"><p>รายการค่าน้ำ</p><strong>{issuedCount}</strong></article><article className="summary-card"><p>ยอดค่าน้ำรวม</p><strong>฿ {formatMoney(totalWater)}</strong></article><article className="summary-card"><p>ออกบิลแล้ว</p><strong>{issuedCount}</strong></article><article className="summary-card"><p>ชำระแล้ว</p><strong>{paidCount}</strong></article><article className="summary-card"><p>ค้างชำระ</p><strong>{outstandingCount}</strong></article></section><section className="module-panel"><div className="module-toolbar"><span>{visibleRows.length} รายการ <small>· รายการค่าน้ำ</small></span></div><div className="records-table-wrap"><table className="records-table water-records-table"><thead><tr><th>รอบบิล / เดือน</th><th>บ้านเลขที่</th>{showMeterColumns && <><th>มิเตอร์ครั้งก่อน</th><th>มิเตอร์ครั้งนี้</th><th>หน่วยที่ใช้</th></>}<th>อัตราค่าน้ำ</th><th>ค่าน้ำ</th><th>ค่าส่วนกลาง</th><th>ค่าปรับ / ค่าใช้จ่ายอื่น</th><th>ยอดรวมใบแจ้งหนี้</th><th>สถานะ</th></tr></thead><tbody>{visibleRows.map((row) => <tr key={row.key}><td>{row.period}</td><td><strong>{row.house.house_no}</strong><small className="date-cell">{row.house.plot_no}</small></td>{showMeterColumns && <>{row.mode === 'metered' ? <><td>{formatReading(row.previous)}</td><td>{formatReading(row.current)}</td><td>{formatReading(row.units)}</td></> : <><td>—</td><td>—</td><td>—</td></>}</>}<td>{row.mode === 'fixed' ? `฿ ${formatMoney(row.rate)} / บ้าน` : `฿ ${formatMoney(row.rate)} / หน่วย`}</td><td>{row.charge || row.mode === 'fixed' ? `฿ ${formatMoney(row.waterAmount)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.commonFee)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.otherFees)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.total)}` : '—'}</td><td><span className={`status-pill ${statusClass[row.status]}`}>{statusLabels[row.status]}</span></td></tr>)}{visibleRows.length === 0 && <tr><td colSpan={showMeterColumns ? 11 : 8} className="empty-state">ยังไม่มีรายการค่าน้ำ</td></tr>}</tbody></table></div></section></>
 }
 
-function Module({ screen, store, query, setQuery, onEdit, onDelete }: { screen: ModuleScreen | 'water'; store: Store; query: string; setQuery: (value: string) => void; onEdit: (id: number) => void; onDelete: (id: number) => void }) {
+type CommonFeeReportRow = {
+  house: House
+  member?: Member
+  charge?: Charge
+  rate?: Rate
+  commonFee?: number
+  waterAmount: number
+  penalty: number
+  arrears: number
+  billedTotal?: number
+  paid: number
+  balance: number
+  status: string
+}
+
+function ProjectReports({ store }: { store: Store }) {
+  const now = new Date()
+  const currentPeriod = `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
+  const [projectFilter, setProjectFilter] = useState('all')
+  const [periodFilter, setPeriodFilter] = useState(currentPeriod)
+  const [statusFilter, setStatusFilter] = useState('all')
+  const periods = [...new Set([...store.charges.map((charge) => charge.period), currentPeriod])].sort((left, right) => periodKey(right) - periodKey(left))
+  const [month, year] = periodFilter.split('/')
+  const effectiveDate = `${year}-${month}-01`
+  const today = now.toISOString().slice(0, 10)
+  const reportCharges = store.charges.filter((charge) => charge.period === periodFilter && (projectFilter === 'all' || charge.project_id === Number(projectFilter)))
+  const reportRows: CommonFeeReportRow[] = store.houses
+    .filter((house) => projectFilter === 'all' || house.project_id === Number(projectFilter))
+    .map((house) => {
+      const charge = reportCharges.find((item) => item.house_id === house.id)
+      const rate = charge
+        ? store.rates.find((item) => item.id === charge.rate_id)
+        : store.rates.filter((item) => item.project_id === house.project_id && item.status === 'ACTIVE' && item.effective_from <= effectiveDate).sort((left, right) => right.effective_from.localeCompare(left.effective_from))[0]
+      const member = store.members.find((item) => item.house_id === house.id && item.status === 'ACTIVE')
+      const breakdown = charge ? invoiceBreakdown(store, charge) : undefined
+      const status = !charge
+        ? 'NOT_BILLED'
+        : charge.status === 'PAID' || (breakdown?.current ?? 0) <= 0
+          ? 'PAID'
+          : (breakdown?.paid ?? 0) > 0 || charge.status === 'PARTIAL'
+            ? 'PARTIAL'
+            : charge.status === 'OVERDUE' || charge.due_date < today
+              ? 'OVERDUE'
+              : 'UNPAID'
+      const waterAmount = charge?.water_amount ?? 0
+      const penalty = charge?.penalty_amount ?? 0
+      return {
+        house,
+        member,
+        charge,
+        rate,
+        commonFee: charge?.amount,
+        waterAmount,
+        penalty,
+        arrears: breakdown?.arrears ?? 0,
+        billedTotal: charge ? charge.amount + waterAmount + penalty : undefined,
+        paid: breakdown?.paid ?? 0,
+        balance: breakdown?.totalDue ?? 0,
+        status,
+      }
+    })
+    .sort((left, right) => left.house.house_no.localeCompare(right.house.house_no, 'th', { numeric: true }))
+  const statusLabels: Record<string, string> = { NOT_BILLED: 'ยังไม่ออกบิล', UNPAID: 'รอชำระ', PARTIAL: 'ชำระบางส่วน', PAID: 'ชำระแล้ว', OVERDUE: 'เกินกำหนด' }
+  const visibleRows = reportRows.filter((row) => statusFilter === 'all' || row.status === statusFilter)
+  const billedRows = reportRows.filter((row) => row.charge)
+  const totalBilled = billedRows.reduce((sum, row) => sum + (row.billedTotal ?? 0), 0)
+  const totalPaid = billedRows.reduce((sum, row) => sum + row.paid, 0)
+  const totalBalance = billedRows.reduce((sum, row) => sum + row.balance, 0)
+  const formatMoney = (value: number) => new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+
+  function exportCsv() {
+    const header = ['รอบบิล', 'บ้านเลขที่', 'แปลง', 'ลูกบ้าน', 'พื้นที่ดิน (ตร.ว.)', 'อัตรา (บาท/ตร.ว.)', 'ค่าส่วนกลาง', 'ค่าน้ำ', 'ค่าปรับ', 'ยอดค้างเดิม', 'ยอดเรียกเก็บ', 'รับชำระแล้ว', 'คงค้าง', 'สถานะ']
+    const values = visibleRows.map((row) => [periodFilter, row.house.house_no, row.house.plot_no, person(row.member), row.house.land_area, row.rate?.amount ?? '', row.commonFee ?? '', row.waterAmount, row.penalty, row.arrears, row.billedTotal ?? '', row.paid, row.balance, statusLabels[row.status]])
+    const csv = [header, ...values].map((record) => record.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n')
+    const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `common-fees-${periodFilter.replace('/', '-')}.csv`
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return <section className="project-report-print">
+    <header className="report-print-header"><h2>รายงานค่าส่วนกลางและสถานะรับชำระ</h2><p>{store.projects.find((project) => project.id === Number(projectFilter))?.project_name ?? 'ทุกโครงการ'} · รอบบิล {periodFilter}</p></header>
+    <section className="water-filters report-filters no-print"><label>โครงการ<select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">ทุกโครงการ</option>{store.projects.map((project) => <option key={project.id} value={project.id}>{project.project_code} · {project.project_name}</option>)}</select></label><label>รอบบิล<select value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>{periods.map((period) => <option value={period} key={period}>{period}</option>)}</select></label><label>สถานะ<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">ทุกสถานะ</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><div className="report-actions"><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={15} />ส่งออก CSV</button><button className="secondary-button" onClick={() => window.print()}><Printer size={15} />พิมพ์รายงาน</button></div></section>
+    <section className="summary-grid report-summary-grid"><article className="summary-card"><p>บ้านในรายงาน</p><strong>{reportRows.length}</strong></article><article className="summary-card"><p>ออกบิลแล้ว</p><strong>{billedRows.length}</strong></article><article className="summary-card"><p>ยอดเรียกเก็บรอบนี้</p><strong>฿ {formatMoney(totalBilled)}</strong></article><article className="summary-card"><p>รับชำระแล้ว</p><strong>฿ {formatMoney(totalPaid)}</strong></article><article className="summary-card"><p>ยอดคงค้าง</p><strong>฿ {formatMoney(totalBalance)}</strong></article></section>
+    <section className="module-panel"><div className="module-toolbar"><span>{visibleRows.length} รายการ <small>· รอบบิล {periodFilter}</small></span></div><div className="records-table-wrap"><table className="records-table report-table"><thead><tr><th>บ้าน / แปลง</th><th>ลูกบ้าน</th><th>พื้นที่ดิน</th><th>อัตรา / ตร.ว.</th><th>ค่าส่วนกลาง</th><th>ค่าน้ำ</th><th>ค่าปรับ</th><th>ค้างเดิม</th><th>ยอดเรียกเก็บ</th><th>รับชำระ</th><th>คงค้าง</th><th>สถานะ</th></tr></thead><tbody>{visibleRows.map((row) => <tr key={row.house.id}><td><strong>{row.house.house_no}</strong><small className="date-cell">{row.house.plot_no}</small></td><td>{person(row.member)}</td><td>{new Intl.NumberFormat('th-TH', { maximumFractionDigits: 2 }).format(row.house.land_area)} ตร.ว.</td><td>{row.rate ? `฿ ${formatMoney(row.rate.amount)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.commonFee ?? 0)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.waterAmount)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.penalty)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.arrears)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.billedTotal ?? 0)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.paid)}` : '—'}</td><td>{row.charge ? `฿ ${formatMoney(row.balance)}` : '—'}</td><td><span className={`status-pill ${row.status === 'PAID' ? 'status-good' : row.status === 'OVERDUE' ? 'status-warn' : row.status === 'NOT_BILLED' ? 'status-neutral' : 'status-progress'}`}>{statusLabels[row.status]}</span></td></tr>)}{visibleRows.length === 0 && <tr><td colSpan={12} className="empty-state">ไม่พบรายการในตัวกรองนี้</td></tr>}</tbody></table></div></section>
+  </section>
+}
+
+function Module({ screen, store, query, setQuery, onEdit, onDelete }: { screen: ModuleScreen | 'water' | 'reports'; store: Store; query: string; setQuery: (value: string) => void; onEdit: (id: number) => void; onDelete: (id: number) => void }) {
   const [printTarget, setPrintTarget] = useState<PrintTarget | null>(null)
+  if (screen === 'reports') return <ProjectReports store={store} />
   if (screen === 'water') return <WaterList store={store} />
   const houseFor = (id: number) => store.houses.find((house) => house.id === id)
   const memberFor = (id: number) => store.members.find((member) => member.id === id)
