@@ -140,7 +140,7 @@
 .empty-state { padding: 36px !important; color: #8e9a91 !important; text-align: center; }
 .modal-backdrop { position: fixed; inset: 0; z-index: 10; display: grid; place-items: center; padding: 18px; background: #15271fcc; backdrop-filter: blur(3px); }
 .record-modal { width: min(100%, 540px); max-height: min(90vh, 800px); overflow: auto; padding: 22px; border-radius: 8px; background: #fff; box-shadow: 0 20px 80px #1a342d45; animation: modal-in .18s ease-out; }
-.bulk-invoice-modal { width: min(100%, 680px); }
+.bulk-invoice-modal { width: min(100%, 1040px); max-height: min(94vh, 920px); }
 @keyframes modal-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
 .modal-heading { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 18px; }
 .modal-heading h2 { margin: 0; color: #2c4437; font-size: 18px; }
@@ -157,7 +157,7 @@
 .bulk-preview { grid-column: 1 / -1; overflow: hidden; border: 1px solid #e7ece5; border-radius: 5px; }
 .bulk-preview-heading { display: flex; justify-content: space-between; padding: 9px 11px; border-bottom: 1px solid #e9eee8; color: #51665a; background: #f7f9f6; font-size: 9px; }
 .bulk-preview-heading span { color: #85948a; }
-.bulk-preview-list { max-height: 170px; overflow: auto; }
+.bulk-preview-list { max-height: min(34vh, 320px); overflow: auto; }
 .bulk-preview-row { display: flex; justify-content: space-between; gap: 14px; padding: 8px 11px; border-bottom: 1px solid #f0f2ef; color: #57685d; font-size: 9px; }
 .bulk-preview-row:last-child { border-bottom: 0; }
 .bulk-preview-row span:last-child { color: #354c3d; font-weight: 650; white-space: nowrap; }
