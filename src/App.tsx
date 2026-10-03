@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { User } from 'firebase/auth'
 import { ArrowDownToLine, ArrowUpRight, Bell, Building2, Check, ChevronDown, ClipboardList, CreditCard, Droplets, FileText, Home, LayoutDashboard, LockKeyhole, LogOut, Menu, MessageCircle, Pencil, Plus, Printer, Search, ShieldCheck, ToolCase, Trash2, Wallet, Wrench, X } from 'lucide-react'
 import './App.css'
@@ -208,11 +208,12 @@ function readStoreInspection(): StoreInspectionData {
 function App({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const [screen, setScreen] = useState<Screen>('dashboard')
   const [store, setStore] = useState<Store>(readStore)
-  const [query, setQuery] = useState('')
+  const [query, setQueryState] = useState('')
   const [dialog, setDialog] = useState(false)
   const [bulkInvoiceDialog, setBulkInvoiceDialog] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
-  const [activeNavKey, setActiveNavKey] = useState('dashboard')
+  const [activeNavKey, setActiveNavKeyState] = useState('dashboard')
+  const activeNavKeyRef = useRef('dashboard')
   const [reportsExpanded, setReportsExpanded] = useState(false)
   const [mobile, setMobile] = useState(false)
   const [role, setRole] = useState('ผู้บริหาร')
@@ -221,6 +222,17 @@ function App({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const [invoiceCleanup, setInvoiceCleanup] = useState<InvoiceCleanupPreview | null>(null)
   useEffect(() => localStorage.setItem('baanjai-store', JSON.stringify(store)), [store])
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(''), 3000); return () => clearTimeout(timer) }, [toast])
+  const setActiveNavKey = (nextKey: string | ((current: string) => string)) => {
+    const key = typeof nextKey === 'function' ? nextKey(activeNavKeyRef.current) : nextKey
+    activeNavKeyRef.current = key
+    setActiveNavKeyState(key)
+  }
+  const setQuery = (value: string) => {
+    const reportView = value === '' && screen === 'reports' && activeNavKeyRef.current.startsWith('report-')
+      ? activeNavKeyRef.current === 'report-receivables' ? 'receivables' : 'common-fees'
+      : value
+    setQueryState(reportView)
+  }
   const nav = (id: Screen, key: string = id) => { setScreen(id); setActiveNavKey(key); setQuery(''); setMobile(false); if (id !== 'reports') setReportsExpanded(false) }
   const removeRecord = (targetScreen: ModuleScreen | 'water' | 'reports', id: number) => {
     if (targetScreen === 'water' || targetScreen === 'reports') return
