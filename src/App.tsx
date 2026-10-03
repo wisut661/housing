@@ -60,7 +60,7 @@ const initial: Store = {
   projects: [{ id: 1, project_code: 'GV-001', project_name: 'หมู่บ้านเดอะ การ์เด้น วิลล์', address: '88/8 ถ.ร่มเกล้า เขตลาดกระบัง กรุงเทพฯ 10520', phone: '02-345-6789', status: 'ACTIVE', created_at: '2026-01-01', water_billing_mode: 'fixed', water_fixed_amount: 0, water_unit_rate: 0 }],
   houses: [{ id: 101, project_id: 1, house_code: 'GV-A-018', house_no: '88/18', plot_no: 'A-018', house_type: 'บ้านเดี่ยว', land_area: 52, house_area: 168, status: 'OCCUPIED' }, { id: 102, project_id: 1, house_code: 'GV-B-042', house_no: '88/42', plot_no: 'B-042', house_type: 'บ้านเดี่ยว', land_area: 60, house_area: 190, status: 'OCCUPIED' }, { id: 103, project_id: 1, house_code: 'GV-C-011', house_no: '88/51', plot_no: 'C-011', house_type: 'ทาวน์โฮม', land_area: 24, house_area: 128, status: 'OCCUPIED' }],
   members: [{ id: 25, member_code: 'MB-0025', title: 'คุณ', first_name: 'กมลวรรณ', last_name: 'สุวรรณ', phone: '081-234-5678', line_id: 'kamonwan18', email: 'kamonwan@example.com', status: 'ACTIVE', house_id: 101 }, { id: 26, member_code: 'MB-0026', title: 'คุณ', first_name: 'ธนกร', last_name: 'ใจดี', phone: '089-123-4567', line_id: 'thanakorn42', email: 'thanakorn@example.com', status: 'ACTIVE', house_id: 102 }, { id: 27, member_code: 'MB-0027', title: 'คุณ', first_name: 'วราภรณ์', last_name: 'มั่นคง', phone: '086-765-4321', line_id: 'wara_c11', email: 'waraporn@example.com', status: 'ACTIVE', house_id: 103 }],
-  rates: [{ id: 1, project_id: 1, amount: 1500, unit: 'บาท / แปลง / เดือน', effective_from: '2026-01-01', status: 'ACTIVE' }],
+  rates: [{ id: 1, project_id: 1, amount: 1500, unit: 'บาท / ตร.ว. / เดือน', effective_from: '2026-01-01', status: 'ACTIVE' }],
   charges: [{ id: 1, charge_no: 'INV69090001', project_id: 1, rate_id: 1, house_id: 101, member_id: 25, period: '09/2026', amount: 1500, due_date: '2026-09-30', status: 'UNPAID' }, { id: 2, charge_no: 'INV69090002', project_id: 1, rate_id: 1, house_id: 102, member_id: 26, period: '09/2026', amount: 1500, due_date: '2026-09-30', status: 'PAID' }, { id: 3, charge_no: 'INV69090003', project_id: 1, rate_id: 1, house_id: 103, member_id: 27, period: '09/2026', amount: 1500, due_date: '2026-09-30', status: 'OVERDUE' }, { id: 4, charge_no: 'INV69080001', project_id: 1, rate_id: 1, house_id: 101, member_id: 25, period: '08/2026', amount: 1500, due_date: '2026-08-31', status: 'OVERDUE' }],
   payments: [{ id: 1, payment_no: 'RC69090001', payment_date: '2026-09-15', member_id: 26, house_id: 102, charge_id: 2, amount: 1500, payment_method: 'TRANSFER', bank_account: 'KBANK', reference_no: 'xxx123', status: 'CONFIRMED' }],
   paymentAllocations: [],
@@ -87,6 +87,10 @@ const getStatus = (status: string) => ({ ACTIVE: 'ใช้งาน', OCCUPIED:
 function periodKey(period: string) {
   const [month, year] = period.split('/').map(Number)
   return year * 12 + month
+}
+
+function commonFeeForHouse(rate: Rate, house: House) {
+  return rate.amount * house.land_area
 }
 
 function amountAllocated(store: Store, chargeId: number) {
@@ -154,7 +158,7 @@ function generateMonthlyInvoices(store: Store, date: Date, projectId: number, du
     const waterReading = waterReadings[house.id]
     const waterUnits = waterReading ? Math.max(0, waterReading.current - waterReading.previous) : 0
     const waterAmount = project?.water_billing_mode === 'metered' ? waterUnits * (project.water_unit_rate ?? 0) : project?.water_fixed_amount ?? 0
-    const charge: Charge = { id: Math.max(0, ...next.charges.map((item) => item.id)) + 1, charge_no: `INV${buddhistYear}${String(month).padStart(2, '0')}${String(sequence).padStart(4, '0')}`, project_id: house.project_id, rate_id: rate.id, house_id: house.id, member_id: member.id, period, amount: rate.amount, water_amount: waterAmount, ...(waterReading ? { water_previous_reading: waterReading.previous, water_current_reading: waterReading.current, water_units: waterUnits } : {}), issued_at: issuedAt, due_date: dueDate, status: 'UNPAID' }
+    const charge: Charge = { id: Math.max(0, ...next.charges.map((item) => item.id)) + 1, charge_no: `INV${buddhistYear}${String(month).padStart(2, '0')}${String(sequence).padStart(4, '0')}`, project_id: house.project_id, rate_id: rate.id, house_id: house.id, member_id: member.id, period, amount: commonFeeForHouse(rate, house), water_amount: waterAmount, ...(waterReading ? { water_previous_reading: waterReading.previous, water_current_reading: waterReading.current, water_units: waterUnits } : {}), issued_at: issuedAt, due_date: dueDate, status: 'UNPAID' }
     charge.penalty_amount = invoiceBreakdown(next, charge).penalty
     next.charges.push(charge)
     created += 1
@@ -164,7 +168,13 @@ function generateMonthlyInvoices(store: Store, date: Date, projectId: number, du
 }
 
 function readStore(): Store {
-  try { const value = localStorage.getItem('baanjai-store'); return value ? { ...initial, ...JSON.parse(value) } : initial } catch { return initial }
+  try {
+    const value = localStorage.getItem('baanjai-store')
+    if (!value) return initial
+    const stored = JSON.parse(value) as Partial<Store>
+    const rates = Array.isArray(stored.rates) ? stored.rates.map((rate) => rate.unit === 'บาท / แปลง / เดือน' ? { ...rate, unit: 'บาท / ตร.ว. / เดือน' } : rate) : initial.rates
+    return { ...initial, ...stored, rates }
+  } catch { return initial }
 }
 
 function readStoreInspection(): StoreInspectionData {
@@ -366,7 +376,7 @@ function BulkInvoiceDialog({ store, close, save }: { store: Store; close: () => 
     const currentReading = currentReadingText.trim() ? Number(currentReadingText) : previousReading
     const waterUnits = Math.max(0, currentReading - previousReading)
     const waterAmount = waterBillingMode === 'metered' ? waterUnits * (project?.water_unit_rate ?? 0) : project?.water_fixed_amount ?? 0
-    const charge: Charge = { id: -house.id, charge_no: '', project_id: house.project_id, rate_id: rate?.id ?? 0, house_id: house.id, member_id: member?.id ?? 0, period: periodLabel, amount: rate?.amount ?? 0, water_amount: waterAmount, ...(waterBillingMode === 'metered' ? { water_previous_reading: previousReading, water_current_reading: currentReading, water_units: waterUnits } : {}), issued_at: issueDate, due_date: dueDate, status: 'UNPAID' }
+    const charge: Charge = { id: -house.id, charge_no: '', project_id: house.project_id, rate_id: rate?.id ?? 0, house_id: house.id, member_id: member?.id ?? 0, period: periodLabel, amount: rate ? commonFeeForHouse(rate, house) : 0, water_amount: waterAmount, ...(waterBillingMode === 'metered' ? { water_previous_reading: previousReading, water_current_reading: currentReading, water_units: waterUnits } : {}), issued_at: issueDate, due_date: dueDate, status: 'UNPAID' }
     return { house, member, rate, exists, charge, previousReading, currentReading, hasCurrentReading: currentReadingText.trim() !== '', waterUnits, waterAmount, total: rate && member ? invoiceBreakdown(store, charge).totalDue : 0 }
   })
   const readyInvoices = invoices.filter((item) => item.member && item.rate && !item.exists)
@@ -524,7 +534,7 @@ function PrintDocument({ target, store, close }: { target: PrintTarget; store: S
 function EntryDialog({ screen, store, editId, close, save }: { screen: ModuleScreen; store: Store; editId: number | null; close: () => void; save: (next: Store) => void }) {
   const [error, setError] = useState('')
   const [form, setForm] = useState<Record<string, string>>(() => {
-    const defaults = { project_id: '1', house_id: String(store.houses[0]?.id ?? ''), member_id: String(store.members[0]?.id ?? ''), rate_id: String(store.rates[0]?.id ?? ''), charge_id: String(store.charges.find((charge) => charge.status !== 'PAID')?.id ?? ''), payment_date: new Date().toISOString().slice(0, 10), due_date: '2026-10-31', effective_from: new Date().toISOString().slice(0, 10), period: '10/2026', created_at: new Date().toISOString().slice(0, 10), status: 'ACTIVE', payment_method: 'TRANSFER', bank_account: 'KBANK', amount: String(store.rates[0]?.amount ?? 1500), unit: 'บาท / แปลง / เดือน', land_area: '50', house_area: '150', house_type: 'บ้านเดี่ยว', water_billing_mode: 'fixed', water_fixed_amount: '0', water_unit_rate: '0' }
+    const defaults = { project_id: '1', house_id: String(store.houses[0]?.id ?? ''), member_id: String(store.members[0]?.id ?? ''), rate_id: String(store.rates[0]?.id ?? ''), charge_id: String(store.charges.find((charge) => charge.status !== 'PAID')?.id ?? ''), payment_date: new Date().toISOString().slice(0, 10), due_date: '2026-10-31', effective_from: new Date().toISOString().slice(0, 10), period: '10/2026', created_at: new Date().toISOString().slice(0, 10), status: 'ACTIVE', payment_method: 'TRANSFER', bank_account: 'KBANK', amount: String(store.rates[0]?.amount ?? 1500), unit: 'บาท / ตร.ว. / เดือน', land_area: '50', house_area: '150', house_type: 'บ้านเดี่ยว', water_billing_mode: 'fixed', water_fixed_amount: '0', water_unit_rate: '0' }
     if (screen === 'payments' && editId === null) Object.assign(defaults, { house_id: '', member_id: '', charge_id: '', amount: '0' })
     if (editId === null) return defaults
     const source = screen === 'projects' ? store.projects.find((item) => item.id === editId)
@@ -551,6 +561,9 @@ function EntryDialog({ screen, store, editId, close, save }: { screen: ModuleScr
   const members = store.members.map((item) => [String(item.id), `${item.title}${item.first_name} ${item.last_name}`] as [string, string])
   const waterBillingMode = form.water_billing_mode as WaterBillingMode
   const selectedBillingProject = store.projects.find((item) => item.id === Number(form.project_id))
+  const selectedBillingHouse = store.houses.find((item) => item.id === Number(form.house_id))
+  const selectedCommonFeeRate = store.rates.find((item) => item.id === Number(form.rate_id))
+  const selectedCommonFeeAmount = selectedBillingHouse && selectedCommonFeeRate ? commonFeeForHouse(selectedCommonFeeRate, selectedBillingHouse) : undefined
   const lastWaterReading = store.charges.filter((charge) => charge.project_id === Number(form.project_id) && charge.house_id === Number(form.house_id) && charge.water_current_reading !== undefined && periodKey(charge.period) < periodKey(form.period)).sort((left, right) => periodKey(right.period) - periodKey(left.period))[0]
   const waterPreviousReading = Number(form.water_previous_reading || lastWaterReading?.water_current_reading || 0)
   const waterCurrentReadingText = form.water_current_reading ?? ''
@@ -577,7 +590,9 @@ function EntryDialog({ screen, store, editId, close, save }: { screen: ModuleScr
         }
         const waterUnits = project?.water_billing_mode === 'metered' ? currentReading - waterPreviousReading : 0
         const waterAmount = project?.water_billing_mode === 'metered' ? waterUnits * (project.water_unit_rate ?? 0) : project?.water_fixed_amount ?? 0
-        next.charges = next.charges.map((item) => item.id === editId ? { ...item, project_id: Number(form.project_id), rate_id: Number(form.rate_id), house_id: Number(form.house_id), member_id: Number(form.member_id), period: form.period, amount: next.rates.find((rate) => rate.id === Number(form.rate_id))?.amount ?? item.amount, water_amount: waterAmount, ...(project?.water_billing_mode === 'metered' ? { water_previous_reading: waterPreviousReading, water_current_reading: currentReading, water_units: waterUnits } : { water_previous_reading: undefined, water_current_reading: undefined, water_units: undefined }), due_date: form.due_date, status: form.status } : item)
+        const house = next.houses.find((item) => item.id === Number(form.house_id))
+        const rate = next.rates.find((item) => item.id === Number(form.rate_id))
+        next.charges = next.charges.map((item) => item.id === editId ? { ...item, project_id: Number(form.project_id), rate_id: Number(form.rate_id), house_id: Number(form.house_id), member_id: Number(form.member_id), period: form.period, amount: rate && house ? commonFeeForHouse(rate, house) : item.amount, water_amount: waterAmount, ...(project?.water_billing_mode === 'metered' ? { water_previous_reading: waterPreviousReading, water_current_reading: currentReading, water_units: waterUnits } : { water_previous_reading: undefined, water_current_reading: undefined, water_units: undefined }), due_date: form.due_date, status: form.status } : item)
       }
       else if (screen === 'payments') next.payments = next.payments.map((item) => item.id === editId ? { ...item, payment_date: form.payment_date, payment_method: form.payment_method, bank_account: form.bank_account, reference_no: form.reference_no } : item)
       else {
@@ -592,12 +607,26 @@ function EntryDialog({ screen, store, editId, close, save }: { screen: ModuleScr
     else if (screen === 'houses') next.houses.unshift({ id: id(), project_id: Number(form.project_id), house_code: form.house_code, house_no: form.house_no, plot_no: form.plot_no, house_type: form.house_type, land_area: Number(form.land_area), house_area: Number(form.house_area), status: form.status })
     else if (screen === 'members') next.members.unshift({ id: id(), member_code: form.member_code, title: form.title, first_name: form.first_name, last_name: form.last_name, phone: form.phone, line_id: form.line_id, email: form.email, status: form.status, house_id: Number(form.house_id) || undefined })
     else if (screen === 'rates') next.rates.unshift({ id: id(), project_id: Number(form.project_id), amount: Number(form.amount), unit: form.unit, effective_from: form.effective_from, status: form.status })
-    else if (screen === 'charges') { const rate = next.rates.find((item) => item.id === Number(form.rate_id)); const project = next.projects.find((item) => item.id === Number(form.project_id)); const currentReading = Number(waterCurrentReadingText); if (project?.water_billing_mode === 'metered' && (!waterCurrentReadingText || waterPreviousReading < 0 || currentReading < waterPreviousReading)) { setError('กรุณากรอกเลขมิเตอร์ปัจจุบัน และต้องไม่น้อยกว่าเลขครั้งก่อน'); return } const waterUnits = project?.water_billing_mode === 'metered' ? currentReading - waterPreviousReading : 0; const waterAmount = project?.water_billing_mode === 'metered' ? waterUnits * (project.water_unit_rate ?? 0) : project?.water_fixed_amount ?? 0; const charge: Charge = { id: id(), charge_no: `INV${String(new Date().getFullYear() + 543).slice(-2)}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(next.charges.length + 1).padStart(4, '0')}`, project_id: Number(form.project_id), rate_id: Number(form.rate_id), house_id: Number(form.house_id), member_id: Number(form.member_id), period: form.period, amount: Number(rate?.amount ?? 0), water_amount: waterAmount, ...(project?.water_billing_mode === 'metered' ? { water_previous_reading: waterPreviousReading, water_current_reading: currentReading, water_units: waterUnits } : {}), issued_at: new Date().toISOString().slice(0, 10), due_date: form.due_date, status: 'UNPAID' }; charge.penalty_amount = invoiceBreakdown(next, charge).penalty; next.charges.unshift(charge) }
+    else if (screen === 'charges') {
+      const rate = next.rates.find((item) => item.id === Number(form.rate_id))
+      const house = next.houses.find((item) => item.id === Number(form.house_id))
+      const project = next.projects.find((item) => item.id === Number(form.project_id))
+      const currentReading = Number(waterCurrentReadingText)
+      if (project?.water_billing_mode === 'metered' && (!waterCurrentReadingText || waterPreviousReading < 0 || currentReading < waterPreviousReading)) {
+        setError('กรุณากรอกเลขมิเตอร์ปัจจุบัน และต้องไม่น้อยกว่าเลขครั้งก่อน')
+        return
+      }
+      const waterUnits = project?.water_billing_mode === 'metered' ? currentReading - waterPreviousReading : 0
+      const waterAmount = project?.water_billing_mode === 'metered' ? waterUnits * (project.water_unit_rate ?? 0) : project?.water_fixed_amount ?? 0
+      const charge: Charge = { id: id(), charge_no: `INV${String(new Date().getFullYear() + 543).slice(-2)}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(next.charges.length + 1).padStart(4, '0')}`, project_id: Number(form.project_id), rate_id: Number(form.rate_id), house_id: Number(form.house_id), member_id: Number(form.member_id), period: form.period, amount: rate && house ? commonFeeForHouse(rate, house) : 0, water_amount: waterAmount, ...(project?.water_billing_mode === 'metered' ? { water_previous_reading: waterPreviousReading, water_current_reading: currentReading, water_units: waterUnits } : {}), issued_at: new Date().toISOString().slice(0, 10), due_date: form.due_date, status: 'UNPAID' }
+      charge.penalty_amount = invoiceBreakdown(next, charge).penalty
+      next.charges.unshift(charge)
+    }
     else if (screen === 'payments') { const chargeId = Number(form.charge_id); const charge = next.charges.find((item) => item.id === chargeId); if (!charge) { setError('ไม่พบใบแจ้งหนี้ที่เลือก'); return } const breakdown = invoiceBreakdown(next, charge); charge.penalty_amount = breakdown.penalty; const outstandingBalance = chargeBalance(next, charge); const amount = Number(form.amount || outstandingBalance); if (outstandingBalance <= 0 || amount <= 0 || amount > outstandingBalance) { setError('ใบแจ้งหนี้นี้ไม่มียอดคงเหลือ หรือยอดรับชำระเกินยอดคงเหลือ'); return } const paymentId = id(); const unallocated = allocatePayment(next, paymentId, amount, charge); if (unallocated > 0.009) { setError('ไม่สามารถจัดสรรยอดรับชำระได้ครบ'); return } next.payments.unshift({ id: paymentId, payment_no: `RC${String(new Date().getFullYear() + 543).slice(-2)}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(next.payments.length + 1).padStart(4, '0')}`, payment_date: form.payment_date, member_id: Number(form.member_id), house_id: Number(form.house_id), charge_id: chargeId, amount, payment_method: form.payment_method, bank_account: form.bank_account, reference_no: form.reference_no, status: 'CONFIRMED' }) }
     else { const list = next[screen] as Item[]; list.unshift({ id: id(), title: form.name, detail: form.detail, status: screen === 'repairs' ? 'รับเรื่องแล้ว' : screen === 'announcements' ? 'ร่าง' : 'รายการใหม่', date: form.created_at, ...(form.amount ? { amount: Number(form.amount) } : {}) }) }
     save(next)
   }
-  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}><section className="record-modal" role="dialog" aria-modal="true"><div className="modal-heading"><div><p className="eyebrow">{labels[screen]}</p><h2>{editId === null ? actionText[screen] : `แก้ไข${labels[screen]}`}</h2></div><button className="icon-button" onClick={close} aria-label="ปิด"><X size={19} /></button></div><form onSubmit={submit}>
+  return <div className="modal-backdrop" onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}><section className="record-modal" role="dialog" aria-modal="true"><div className="modal-heading"><div><p className="eyebrow">{labels[screen]}</p><h2>{editId === null ? actionText[screen] : `แก้ไข${labels[screen]}`}</h2></div><button className="icon-button" onClick={close} aria-label="ปิด"><X size={19} /></button></div><form onSubmit={submit}>{screen === 'charges' && selectedBillingHouse && selectedCommonFeeRate && <p className="form-hint">ค่าส่วนกลางที่คำนวณแล้ว: ฿ {num(selectedCommonFeeAmount ?? 0)} ({num(selectedBillingHouse.land_area)} ตร.ว. × ฿ {num(selectedCommonFeeRate.amount)} / ตร.ว.)</p>}
     {screen === 'projects' && <>{field('project_code', 'รหัสโครงการ')}{field('project_name', 'ชื่อโครงการ')}{field('address', 'ที่อยู่')}{field('phone', 'โทรศัพท์', 'tel')}{select('water_billing_mode', 'รูปแบบคิดค่าน้ำ', [['fixed', 'อัตราคงที่ต่อรอบ'], ['metered', 'คิดตามหน่วยมิเตอร์']])}{waterBillingMode === 'fixed' ? field('water_fixed_amount', 'ค่าน้ำต่อรอบ (บาท)', 'number') : field('water_unit_rate', 'อัตราค่าน้ำ (บาท / หน่วย)', 'number')}{select('status', 'สถานะ', [['ACTIVE', 'ใช้งาน'], ['INACTIVE', 'ปิดใช้งาน']])}{field('created_at', 'วันที่สร้าง', 'date')}</>}
     {screen === 'houses' && <>{select('project_id', 'โครงการ', store.projects.map((item) => [String(item.id), item.project_name]))}{field('house_code', 'รหัสบ้าน')}{field('house_no', 'บ้านเลขที่')}{field('plot_no', 'เลขที่แปลง')}{select('house_type', 'ประเภทบ้าน', [['บ้านเดี่ยว', 'บ้านเดี่ยว'], ['บ้านแฝด', 'บ้านแฝด'], ['ทาวน์โฮม', 'ทาวน์โฮม']])}{field('land_area', 'พื้นที่ดิน (ตร.ว.)', 'number')}{field('house_area', 'พื้นที่บ้าน (ตร.ม.)', 'number')}{select('status', 'สถานะ', [['OCCUPIED', 'มีผู้อยู่อาศัย'], ['VACANT', 'ว่าง']])}</>}
     {screen === 'members' && <>{field('member_code', 'รหัสสมาชิก')}{select('title', 'คำนำหน้า', [['คุณ', 'คุณ'], ['นาย', 'นาย'], ['นาง', 'นาง'], ['นางสาว', 'นางสาว']])}{field('first_name', 'ชื่อ')}{field('last_name', 'นามสกุล')}{field('phone', 'โทรศัพท์', 'tel')}{field('line_id', 'LINE ID', 'text', false)}{field('email', 'Email', 'email', false)}{select('house_id', 'บ้านที่เชื่อมโยง', [['', 'ไม่ระบุบ้าน'], ...houses], undefined, false)}{select('status', 'สถานะ', [['ACTIVE', 'ใช้งาน'], ['INACTIVE', 'ไม่ใช้งาน']])}</>}
