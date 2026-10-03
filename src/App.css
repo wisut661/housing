@@ -152,6 +152,9 @@
 .house-range > small { grid-column: 1 / -1; margin-top: -3px; color: #89958c; font-size: 9px; }
 .bulk-summary { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
 .report-summary-grid { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); }
+.report-tabs { display: flex; width: max-content; max-width: 100%; gap: 3px; padding: 3px; margin-bottom: 14px; border-radius: 6px; background: #edf1ed; }
+.report-tab { min-height: 34px; padding: 0 12px; border: 0; border-radius: 4px; color: #637369; background: transparent; font: inherit; font-size: 11px; cursor: pointer; }
+.report-tab.active { color: #2f5a42; background: #fff; box-shadow: 0 1px 3px #203d3518; font-weight: 650; }
 .report-actions { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; }
 .report-print-header { display: none; }
 .report-table { min-width: 1000px; }
@@ -257,6 +260,8 @@
   .records-table { min-width: 680px; }
   .record-modal { padding: 18px; }
   .bulk-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .report-tabs { width: 100%; }
+  .report-tab { flex: 1; padding: 0 8px; }
   .setup-steps { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .print-overlay { padding: 10px; }
   .print-document { width: 100%; min-height: auto; padding: 10mm 8mm; }
