@@ -590,7 +590,18 @@ function OverdueReceivablesReport({ store }: { store: Store }) {
   const today = new Date().toISOString().slice(0, 10)
   const [projectFilter, setProjectFilter] = useState('all')
   const [ageFilter, setAgeFilter] = useState('all')
+  const [memberFromFilter, setMemberFromFilter] = useState('')
+  const [memberToFilter, setMemberToFilter] = useState('')
   const formatMoney = (value: number) => new Intl.NumberFormat('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value)
+  const projectResidents = store.members.flatMap((member) => {
+    if (member.status !== 'ACTIVE' || member.house_id === undefined) return []
+    const house = store.houses.find((item) => item.id === member.house_id && (projectFilter === 'all' || item.project_id === Number(projectFilter)))
+    return house ? [{ member, house }] : []
+  }).sort((left, right) => left.house.house_no.localeCompare(right.house.house_no, 'th', { numeric: true }))
+  const memberFromIndex = projectResidents.findIndex(({ member }) => member.id === Number(memberFromFilter))
+  const memberToIndex = projectResidents.findIndex(({ member }) => member.id === Number(memberToFilter))
+  const rangeStart = memberFromIndex < 0 ? 0 : memberToIndex < 0 ? memberFromIndex : Math.min(memberFromIndex, memberToIndex)
+  const rangeEnd = memberToIndex < 0 ? projectResidents.length - 1 : memberFromIndex < 0 ? memberToIndex : Math.max(memberFromIndex, memberToIndex)
   const rows: OverdueReportRow[] = store.charges.flatMap((charge) => {
     if (projectFilter !== 'all' && charge.project_id !== Number(projectFilter)) return []
     const outstanding = chargeBalance(store, charge)
@@ -602,7 +613,12 @@ function OverdueReceivablesReport({ store }: { store: Store }) {
     const house = store.houses.find((item) => item.id === charge.house_id)
     if (!house) return []
     return [{ charge, house, member: store.members.find((item) => item.house_id === house.id && item.status === 'ACTIVE'), outstanding, paid: Math.max(0, charge.amount + (charge.water_amount ?? 0) + (charge.penalty_amount ?? 0) - outstanding), daysOverdue, ageBucket }]
-  }).filter((row) => ageFilter === 'all' || row.ageBucket === ageFilter).sort((left, right) => right.daysOverdue - left.daysOverdue || right.outstanding - left.outstanding)
+  }).filter((row) => {
+    if (ageFilter !== 'all' && row.ageBucket !== ageFilter) return false
+    if (!memberFromFilter && !memberToFilter) return true
+    const residentIndex = projectResidents.findIndex(({ house }) => house.id === row.house.id)
+    return residentIndex >= rangeStart && residentIndex <= rangeEnd
+  }).sort((left, right) => right.daysOverdue - left.daysOverdue || right.outstanding - left.outstanding)
   const totalOutstanding = rows.reduce((sum, row) => sum + row.outstanding, 0)
   const bucketTotals: Record<OverdueReportRow['ageBucket'], number> = { 'not-due': 0, '1-30': 0, '31-60': 0, '61-90': 0, '90+': 0 }
   for (const row of rows) bucketTotals[row.ageBucket] += row.outstanding
@@ -623,7 +639,7 @@ function OverdueReceivablesReport({ store }: { store: Store }) {
 
   return <>
     <header className="report-print-header"><h2>รายงานลูกหนี้ค้างชำระ</h2><p>{projectName} · ข้อมูล ณ {today}</p></header>
-    <section className="water-filters report-filters no-print"><label>โครงการ<select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">ทุกโครงการ</option>{store.projects.map((project) => <option key={project.id} value={project.id}>{project.project_code} · {project.project_name}</option>)}</select></label><label>อายุหนี้<select value={ageFilter} onChange={(event) => setAgeFilter(event.target.value)}><option value="all">ทุกช่วงอายุ</option><option value="not-due">ยังไม่ถึงกำหนด</option><option value="1-30">1–30 วัน</option><option value="31-60">31–60 วัน</option><option value="61-90">61–90 วัน</option><option value="90+">เกิน 90 วัน</option></select></label><div className="report-actions"><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={15} />ส่งออก CSV</button><button className="secondary-button" onClick={() => window.print()}><Printer size={15} />พิมพ์รายงาน</button></div></section>
+    <section className="water-filters report-filters no-print"><label>โครงการ<select value={projectFilter} onChange={(event) => { setProjectFilter(event.target.value); setMemberFromFilter(''); setMemberToFilter('') }}><option value="all">ทุกโครงการ</option>{store.projects.map((project) => <option key={project.id} value={project.id}>{project.project_code} · {project.project_name}</option>)}</select></label><label>จากลูกบ้าน<select value={memberFromFilter} onChange={(event) => setMemberFromFilter(event.target.value)}><option value="">เริ่มต้นทั้งหมด</option>{projectResidents.map(({ member, house }) => <option value={member.id} key={member.id}>{house.house_no} · {person(member)}</option>)}</select></label><label>ถึงลูกบ้าน<select value={memberToFilter} onChange={(event) => setMemberToFilter(event.target.value)}><option value="">สิ้นสุดทั้งหมด</option>{projectResidents.map(({ member, house }) => <option value={member.id} key={member.id}>{house.house_no} · {person(member)}</option>)}</select></label><label>อายุหนี้<select value={ageFilter} onChange={(event) => setAgeFilter(event.target.value)}><option value="all">ทุกช่วงอายุ</option><option value="not-due">ยังไม่ถึงกำหนด</option><option value="1-30">1–30 วัน</option><option value="31-60">31–60 วัน</option><option value="61-90">61–90 วัน</option><option value="90+">เกิน 90 วัน</option></select></label><div className="report-actions"><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={15} />ส่งออก CSV</button><button className="secondary-button" onClick={() => window.print()}><Printer size={15} />พิมพ์รายงาน</button></div></section>
     <section className="summary-grid report-summary-grid"><article className="summary-card"><p>ใบแจ้งหนี้ค้างชำระ</p><strong>{rows.length}</strong></article><article className="summary-card"><p>ยอดค้างรวม</p><strong>฿ {formatMoney(totalOutstanding)}</strong></article>{(Object.keys(ageLabels) as OverdueReportRow['ageBucket'][]).map((bucket) => <article className="summary-card" key={bucket}><p>{ageLabels[bucket]}</p><strong>฿ {formatMoney(bucketTotals[bucket])}</strong></article>)}</section>
     <section className="module-panel"><div className="module-toolbar"><span>{rows.length} รายการ <small>· ลูกหนี้คงค้าง</small></span></div><div className="records-table-wrap"><table className="records-table report-table"><thead><tr><th>บ้าน / แปลง</th><th>ลูกบ้าน</th><th>ใบแจ้งหนี้</th><th>รอบบิล</th><th>ครบกำหนด</th><th>เกินกำหนด</th><th>รับชำระแล้ว</th><th>คงค้าง</th><th>อายุหนี้</th></tr></thead><tbody>{rows.map((row) => <tr key={row.charge.id}><td><strong>{row.house.house_no}</strong><small className="date-cell">{row.house.plot_no}</small></td><td>{person(row.member)}<small className="date-cell">{row.member?.phone ?? ''}</small></td><td>{row.charge.charge_no}</td><td>{row.charge.period}</td><td>{row.charge.due_date}</td><td>{row.daysOverdue === 0 ? 'ยังไม่ถึงกำหนด' : `${row.daysOverdue} วัน`}</td><td>฿ {formatMoney(row.paid)}</td><td><strong>฿ {formatMoney(row.outstanding)}</strong></td><td><span className={`status-pill ${row.ageBucket === '90+' ? 'status-warn' : row.ageBucket === 'not-due' ? 'status-neutral' : 'status-progress'}`}>{ageLabels[row.ageBucket]}</span></td></tr>)}{rows.length === 0 && <tr><td colSpan={9} className="empty-state">ไม่มีลูกหนี้คงค้าง</td></tr>}</tbody></table></div></section>
   </>
