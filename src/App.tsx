@@ -71,7 +71,12 @@ const initial: Store = {
 }
 
 const labels: Record<Screen, string> = { dashboard: 'ภาพรวม Dashboard', projects: 'โครงการ', houses: 'บ้าน / แปลง', members: 'ลูกบ้าน', rates: 'อัตราค่าส่วนกลาง', charges: 'ใบแจ้งหนี้', payments: 'รับชำระ', water: 'รายการค่าน้ำ', repairs: 'แจ้งซ่อม / งานบริการ', assets: 'ทรัพย์สินส่วนกลาง', finance: 'รายรับ / รายจ่าย', announcements: 'ประกาศ / LINE', reports: 'รายงานโครงการ' }
+type ReportView = 'common-fees' | 'receivables'
 type NavItem = { key: string; label: string; icon: typeof Home; id?: Screen; phase?: string; action?: 'create-charge'; disabled?: boolean }
+const reportNavItems: { key: string; label: string; view: ReportView }[] = [
+  { key: 'report-common-fees', label: 'ค่าส่วนกลางรายเดือน', view: 'common-fees' },
+  { key: 'report-receivables', label: 'ลูกหนี้ค้างชำระ', view: 'receivables' },
+]
 const groups: { label: string; phase: string; items: NavItem[] }[] = [
   { label: 'ข้อมูลหลัก', phase: 'PHASE 1', items: [{ key: 'projects', id: 'projects', label: 'โครงการ', icon: Building2 }, { key: 'houses', id: 'houses', label: 'บ้าน / แปลง', icon: Home }, { key: 'members', id: 'members', label: 'ลูกบ้าน', icon: ClipboardList }, { key: 'rates', id: 'rates', label: 'อัตราค่าส่วนกลาง', icon: Wallet }] },
   { label: 'การเงิน', phase: 'PHASE 1', items: [{ key: 'create-charge', id: 'charges', label: 'สร้างใบเรียกเก็บ', icon: Plus, action: 'create-charge' }, { key: 'charges', id: 'charges', label: 'ใบแจ้งหนี้', icon: FileText }, { key: 'payments', id: 'payments', label: 'รับชำระ', icon: CreditCard }, { key: 'water', id: 'water', label: 'รายการค่าน้ำ', icon: Droplets }, { key: 'receipts', id: 'payments', label: 'ใบเสร็จ', icon: Printer }] },
@@ -208,6 +213,7 @@ function App({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const [bulkInvoiceDialog, setBulkInvoiceDialog] = useState(false)
   const [editId, setEditId] = useState<number | null>(null)
   const [activeNavKey, setActiveNavKey] = useState('dashboard')
+  const [reportsExpanded, setReportsExpanded] = useState(false)
   const [mobile, setMobile] = useState(false)
   const [role, setRole] = useState('ผู้บริหาร')
   const [toast, setToast] = useState('')
@@ -215,7 +221,7 @@ function App({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const [invoiceCleanup, setInvoiceCleanup] = useState<InvoiceCleanupPreview | null>(null)
   useEffect(() => localStorage.setItem('baanjai-store', JSON.stringify(store)), [store])
   useEffect(() => { if (!toast) return; const timer = window.setTimeout(() => setToast(''), 3000); return () => clearTimeout(timer) }, [toast])
-  const nav = (id: Screen, key: string = id) => { setScreen(id); setActiveNavKey(key); setQuery(''); setMobile(false) }
+  const nav = (id: Screen, key: string = id) => { setScreen(id); setActiveNavKey(key); setQuery(''); setMobile(false); if (id !== 'reports') setReportsExpanded(false) }
   const removeRecord = (targetScreen: ModuleScreen | 'water' | 'reports', id: number) => {
     if (targetScreen === 'water' || targetScreen === 'reports') return
     setStore((previous) => {
@@ -284,7 +290,7 @@ function App({ user, onSignOut }: { user: User; onSignOut: () => void }) {
   const overdue = store.charges.filter((charge) => charge.status === 'OVERDUE')
 
   return <div className="app-shell">
-    <aside className={`sidebar ${mobile ? 'sidebar-open' : ''}`}><button className="brand" onClick={() => nav('dashboard')}><span className="brand-mark"><Home size={20} /></span><span>บ้านใจ<small>COMMUNITY OFFICE</small></span></button><button className={`nav-link dashboard-link ${activeNavKey === 'dashboard' ? 'active' : ''}`} onClick={() => nav('dashboard')}><LayoutDashboard size={17} />Dashboard</button><nav>{groups.map((group) => <section className="nav-group" key={group.label}><div className="nav-group-heading"><p className="nav-label">{group.label}</p><span className="nav-phase">{group.phase}</span></div>{group.items.map((item) => { const Icon = item.icon; const handleClick = () => { if (!item.id || item.disabled) return; nav(item.id, item.key); if (item.action === 'create-charge') { setEditId(null); setBulkInvoiceDialog(true) } }; return <button key={item.key} disabled={item.disabled} title={item.disabled ? `กำหนดไว้ใน ${group.phase}` : undefined} className={`nav-link ${activeNavKey === item.key ? 'active' : ''} ${item.disabled ? 'nav-link-disabled' : ''}`} onClick={handleClick}><Icon size={17} /><span>{item.label}</span>{item.disabled && <span className="phase-badge">เร็ว ๆ นี้</span>}</button> })}</section>)}</nav><div className="sidebar-bottom"><div className="help-card"><ShieldCheck size={17} /><span>ข้อมูลโครงการ<small>ระบบจัดการชุมชน</small></span></div><div className="profile-row">{user.photoURL ? <img className="avatar profile-avatar" src={user.photoURL} alt="" /> : <span className="avatar">{user.displayName?.[0] ?? user.email?.[0] ?? '?'}</span>}<span className="profile-info">{user.displayName || 'ผู้ใช้ Google'}<small>{user.email}</small></span><button type="button" className="profile-signout" onClick={onSignOut} aria-label="ออกจากระบบ" title="ออกจากระบบ"><LogOut size={16} /></button></div></div></aside>
+    <aside className={`sidebar ${mobile ? 'sidebar-open' : ''}`}><button className="brand" onClick={() => nav('dashboard')}><span className="brand-mark"><Home size={20} /></span><span>บ้านใจ<small>COMMUNITY OFFICE</small></span></button><button className={`nav-link dashboard-link ${activeNavKey === 'dashboard' ? 'active' : ''}`} onClick={() => nav('dashboard')}><LayoutDashboard size={17} />Dashboard</button><nav>{groups.map((group) => <section className="nav-group" key={group.label}><div className="nav-group-heading"><p className="nav-label">{group.label}</p><span className="nav-phase">{group.phase}</span></div>{group.items.map((item) => { const Icon = item.icon; const handleClick = () => { if (!item.id || item.disabled) return; if (item.id === 'reports') { setScreen('reports'); setActiveNavKey((current) => current.startsWith('report-') ? current : 'report-common-fees'); setReportsExpanded((expanded) => !expanded); setQuery(''); setMobile(false); return } nav(item.id, item.key); if (item.action === 'create-charge') { setEditId(null); setBulkInvoiceDialog(true) } }; return <div className="nav-item-group" key={item.key}><button disabled={item.disabled} title={item.disabled ? `กำหนดไว้ใน ${group.phase}` : undefined} aria-expanded={item.id === 'reports' ? reportsExpanded : undefined} className={`nav-link ${(item.id === 'reports' && screen === 'reports') || activeNavKey === item.key ? 'active' : ''} ${item.disabled ? 'nav-link-disabled' : ''}`} onClick={handleClick}><Icon size={17} /><span>{item.label}</span>{item.id === 'reports' && <ChevronDown className={`nav-expand-icon ${reportsExpanded ? 'expanded' : ''}`} size={14} />}{item.disabled && <span className="phase-badge">เร็ว ๆ นี้</span>}</button>{item.id === 'reports' && reportsExpanded && <div className="nav-submenu">{reportNavItems.map((report) => <button key={report.key} type="button" className={`nav-sub-link ${activeNavKey === report.key ? 'active' : ''}`} aria-current={activeNavKey === report.key ? 'page' : undefined} onClick={() => { setScreen('reports'); setActiveNavKey(report.key); setReportsExpanded(true); setQuery(''); setMobile(false) }}>{report.label}</button>)}</div>}</div> })}</section>)}</nav><div className="sidebar-bottom"><div className="help-card"><ShieldCheck size={17} /><span>ข้อมูลโครงการ<small>ระบบจัดการชุมชน</small></span></div><div className="profile-row">{user.photoURL ? <img className="avatar profile-avatar" src={user.photoURL} alt="" /> : <span className="avatar">{user.displayName?.[0] ?? user.email?.[0] ?? '?'}</span>}<span className="profile-info">{user.displayName || 'ผู้ใช้ Google'}<small>{user.email}</small></span><button type="button" className="profile-signout" onClick={onSignOut} aria-label="ออกจากระบบ" title="ออกจากระบบ"><LogOut size={16} /></button></div></div></aside>
     {mobile && <button className="mobile-scrim" onClick={() => setMobile(false)} aria-label="ปิดเมนู" />}
     <button type="button" className="primary-button" style={{ position: 'fixed', right: 20, bottom: 68, zIndex: 7, background: '#b14f3f' }} onClick={() => setInvoiceCleanup(readInvoiceCleanupPreview())}><Trash2 size={16} />ล้างข้อมูลทดสอบใบแจ้งหนี้</button>
     <button type="button" className="secondary-button" style={{ position: 'fixed', right: 20, bottom: 20, zIndex: 7 }} onClick={() => setInspectionData(readStoreInspection())}><ClipboardList size={16} />ตรวจสอบข้อมูลระบบ</button>
@@ -489,13 +495,12 @@ type CommonFeeReportRow = {
   status: string
 }
 
-function ProjectReports({ store }: { store: Store }) {
+function ProjectReports({ store, view }: { store: Store; view: ReportView }) {
   const now = new Date()
   const currentPeriod = `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
   const [projectFilter, setProjectFilter] = useState('all')
   const [periodFilter, setPeriodFilter] = useState(currentPeriod)
   const [statusFilter, setStatusFilter] = useState('all')
-  const [reportView, setReportView] = useState<'common-fees' | 'receivables'>('common-fees')
   const periods = [...new Set([...store.charges.map((charge) => charge.period), currentPeriod])].sort((left, right) => periodKey(right) - periodKey(left))
   const [month, year] = periodFilter.split('/')
   const effectiveDate = `${year}-${month}-01`
@@ -558,8 +563,7 @@ function ProjectReports({ store }: { store: Store }) {
   }
 
   return <section className="project-report-print">
-    <div className="report-tabs no-print" role="group" aria-label="เลือกประเภทรายงาน"><button type="button" className={reportView === 'common-fees' ? 'report-tab active' : 'report-tab'} aria-pressed={reportView === 'common-fees'} onClick={() => setReportView('common-fees')}>ค่าส่วนกลางรายเดือน</button><button type="button" className={reportView === 'receivables' ? 'report-tab active' : 'report-tab'} aria-pressed={reportView === 'receivables'} onClick={() => setReportView('receivables')}>ลูกหนี้ค้างชำระ</button></div>
-    {reportView === 'receivables' ? <OverdueReceivablesReport store={store} /> : <>
+    {view === 'receivables' ? <OverdueReceivablesReport store={store} /> : <>
     <header className="report-print-header"><h2>รายงานค่าส่วนกลางและสถานะรับชำระ</h2><p>{store.projects.find((project) => project.id === Number(projectFilter))?.project_name ?? 'ทุกโครงการ'} · รอบบิล {periodFilter}</p></header>
     <section className="water-filters report-filters no-print"><label>โครงการ<select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">ทุกโครงการ</option>{store.projects.map((project) => <option key={project.id} value={project.id}>{project.project_code} · {project.project_name}</option>)}</select></label><label>รอบบิล<select value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>{periods.map((period) => <option value={period} key={period}>{period}</option>)}</select></label><label>สถานะ<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">ทุกสถานะ</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><div className="report-actions"><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={15} />ส่งออก CSV</button><button className="secondary-button" onClick={() => window.print()}><Printer size={15} />พิมพ์รายงาน</button></div></section>
     <section className="summary-grid report-summary-grid"><article className="summary-card"><p>บ้านในรายงาน</p><strong>{reportRows.length}</strong></article><article className="summary-card"><p>ออกบิลแล้ว</p><strong>{billedRows.length}</strong></article><article className="summary-card"><p>ยอดเรียกเก็บรอบนี้</p><strong>฿ {formatMoney(totalBilled)}</strong></article><article className="summary-card"><p>รับชำระแล้ว</p><strong>฿ {formatMoney(totalPaid)}</strong></article><article className="summary-card"><p>ยอดคงค้าง</p><strong>฿ {formatMoney(totalBalance)}</strong></article></section>
@@ -615,7 +619,7 @@ function OverdueReceivablesReport({ store }: { store: Store }) {
 
 function Module({ screen, store, query, setQuery, onEdit, onDelete }: { screen: ModuleScreen | 'water' | 'reports'; store: Store; query: string; setQuery: (value: string) => void; onEdit: (id: number) => void; onDelete: (id: number) => void }) {
   const [printTarget, setPrintTarget] = useState<PrintTarget | null>(null)
-  if (screen === 'reports') return <ProjectReports store={store} />
+  if (screen === 'reports') return <ProjectReports store={store} view={query === 'receivables' ? 'receivables' : 'common-fees'} />
   if (screen === 'water') return <WaterList store={store} />
   const houseFor = (id: number) => store.houses.find((house) => house.id === id)
   const memberFor = (id: number) => store.members.find((member) => member.id === id)
