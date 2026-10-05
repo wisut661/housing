@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import type { User } from 'firebase/auth'
 import { ArrowDownToLine, ArrowUpRight, Bell, Building2, Check, ChevronDown, ClipboardList, CreditCard, Droplets, FileText, Home, LayoutDashboard, LockKeyhole, LogOut, Menu, MessageCircle, Pencil, Plus, Printer, Search, ShieldCheck, ToolCase, Trash2, Wallet, Wrench, X } from 'lucide-react'
 import './App.css'
@@ -100,6 +100,12 @@ function invoiceIssueDate(charge: Charge) {
   const [month, year] = charge.period.split('/')
   return charge.issued_at ?? `${year}-${month}-01`
 }
+
+function thaiFullDate(dateStr: string) {
+  return new Intl.DateTimeFormat('th-TH', { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date(`${dateStr}T00:00:00`))
+}
+
+const PAYMENT_CHANNELS: Array<[string, string]> = [['CASH', 'เงินสด'], ['TRANSFER', 'โอนเงิน'], ['PROMPTPAY', 'พร้อมเพย์'], ['CHEQUE', 'เช็ค']]
 
 function commonFeeForHouse(rate: Rate, house: House) {
   return rate.amount * house.land_area
@@ -316,7 +322,7 @@ function App({ user, onSignOut }: { user: User; onSignOut: () => void }) {
     <main className="main-area"><header className="topbar"><button className="icon-button mobile-menu" onClick={() => setMobile(true)} aria-label="เปิดเมนู"><Menu size={20} /></button><div className="breadcrumb"><span>โครงการ</span><span>/</span><strong>{labels[screen]}</strong></div><div className="topbar-actions"><label className="role-picker"><ShieldCheck size={15} /><select value={role} onChange={(event) => setRole(event.target.value)}><option>ผู้บริหาร</option><option>เจ้าหน้าที่</option><option>ลูกบ้าน</option></select><ChevronDown size={13} /></label><button className="icon-button" onClick={() => setToast('ไม่มีการแจ้งเตือนใหม่')} aria-label="แจ้งเตือน"><Bell size={18} /></button></div></header>
       <div className="page-content"><div className="page-heading"><div><p className="eyebrow">{project?.project_name ?? 'โครงการ'} <span>·</span> รอบบัญชี ก.ย. 2569</p><h1>{labels[screen]}</h1><p className="page-description">{screen === 'dashboard' ? 'สรุปข้อมูลหลัก ธุรกรรม และงานของโครงการ' : `จัดการ${labels[screen]}ของโครงการ`}</p></div>{screen !== 'dashboard' && screen !== 'water' && screen !== 'reports' && <button className="primary-button" onClick={() => { setEditId(null); if (screen === 'charges') setBulkInvoiceDialog(true); else setDialog(true) }}><Plus size={17} />{actionText[screen]}</button>}</div>
         {screen === 'dashboard' && <SetupFlow store={store} navigate={nav} />}
-        {screen === 'dashboard' ? <><section className="summary-grid"><article className="summary-card"><span className="summary-icon green-icon"><Wallet size={18} /></span><p>รับชำระแล้ว</p><strong>฿ {num(totalPaid)}</strong><small>จาก {store.payments.length} รายการรับเงิน</small></article><article className="summary-card"><span className="summary-icon blue-icon"><Home size={18} /></span><p>บ้าน / แปลง</p><strong>{store.houses.length} <em>แปลง</em></strong><small>{store.members.length} ลูกบ้านในระบบ</small></article><article className="summary-card"><span className="summary-icon amber-icon"><FileText size={18} /></span><p>ใบแจ้งหนี้</p><strong>{store.charges.length} <em>รายการ</em></strong><small>{store.charges.filter((charge) => charge.status === 'PAID').length} รายการชำระแล้ว</small></article><article className="summary-card"><span className="summary-icon red-icon"><Bell size={18} /></span><p>เกินกำหนด</p><strong>{overdue.length} <em>รายการ</em></strong><small>ยอดค้าง ฿ {num(overdue.reduce((sum, item) => sum + item.amount, 0))}</small></article></section><section className="dashboard-columns"><article className="content-panel"><div className="panel-heading"><div><h2>ค่าส่วนกลาง</h2><p>อัตราปัจจุบันและสถานะเรียกเก็บ</p></div><button className="text-button" onClick={() => nav('rates')}>จัดการอัตรา <ArrowUpRight size={14} /></button></div><div className="rate-summary"><div><small>อัตราต่อแปลง / เดือน</small><strong>฿ {num(store.rates[0]?.amount ?? 0)}</strong><span>{store.rates[0]?.unit}</span></div><div className="rate-arrow"><ArrowDownToLine size={20} /></div><div><small>ใบแจ้งหนี้ในระบบ</small><strong>{store.charges.length} <em>รายการ</em></strong><span>เรียกเก็บแล้ว {store.charges.filter((charge) => charge.status === 'PAID').length} รายการ</span></div></div><div className="flow-links"><button onClick={() => nav('charges')}><FileText size={16} />การเรียกเก็บ <ArrowUpRight size={14} /></button><button onClick={() => nav('payments')}><CreditCard size={16} />การรับชำระ <ArrowUpRight size={14} /></button></div></article><article className="content-panel"><div className="panel-heading"><div><h2>งานที่ต้องติดตาม</h2><p>สถานะธุรกรรมและงานบริการ</p></div><span className="task-count">{overdue.length + store.repairs.length}</span></div><button className="task-row" onClick={() => nav('charges')}><span className="task-icon task-red"><FileText size={16} /></span><span><strong>บิลเกินกำหนด</strong><small>{overdue.length} รายการ · ฿ {num(overdue.reduce((sum, item) => sum + item.amount, 0))}</small></span><span>›</span></button><button className="task-row" onClick={() => nav('repairs')}><span className="task-icon task-yellow"><Wrench size={16} /></span><span><strong>งานแจ้งซ่อม</strong><small>{store.repairs.length} รายการในระบบ</small></span><span>›</span></button><button className="task-row" onClick={() => nav('announcements')}><span className="task-icon task-blue"><MessageCircle size={16} /></span><span><strong>ประกาศ / LINE</strong><small>{store.announcements.length} ประกาศ</small></span><span>›</span></button></article></section><div className="role-note">มุมมอง{role} <span>·</span> ข้อมูลตัวอย่าง</div></> : <Module screen={screen} store={store} query={query} setQuery={setQuery} onEdit={(id) => { setEditId(id); setDialog(true) }} onDelete={(id) => removeRecord(screen, id)} />}
+        {screen === 'dashboard' ? <><section className="summary-grid"><article className="summary-card"><span className="summary-icon green-icon"><Wallet size={18} /></span><p>รับชำระแล้ว</p><strong>฿ {num(totalPaid)}</strong><small>จาก {store.payments.length} รายการรับเงิน</small></article><article className="summary-card"><span className="summary-icon blue-icon"><Home size={18} /></span><p>บ้าน / แปลง</p><strong>{store.houses.length} <em>แปลง</em></strong><small>{store.members.length} ลูกบ้านในระบบ</small></article><article className="summary-card"><span className="summary-icon amber-icon"><FileText size={18} /></span><p>ใบแจ้งหนี้</p><strong>{store.charges.length} <em>รายการ</em></strong><small>{store.charges.filter((charge) => charge.status === 'PAID').length} รายการชำระแล้ว</small></article><article className="summary-card"><span className="summary-icon red-icon"><Bell size={18} /></span><p>เกินกำหนด</p><strong>{overdue.length} <em>รายการ</em></strong><small>ยอดค้าง ฿ {num(overdue.reduce((sum, item) => sum + item.amount, 0))}</small></article></section><section className="dashboard-columns"><article className="content-panel"><div className="panel-heading"><div><h2>ค่าส่วนกลาง</h2><p>อัตราปัจจุบันและสถานะเรียกเก็บ</p></div><button className="text-button" onClick={() => nav('rates')}>จัดการอัตรา <ArrowUpRight size={14} /></button></div><div className="rate-summary"><div><small>อัตราต่อแปลง / เดือน</small><strong>฿ {num(store.rates[0]?.amount ?? 0)}</strong><span>{store.rates[0]?.unit}</span></div><div className="rate-arrow"><ArrowDownToLine size={20} /></div><div><small>ใบแจ้งหนี้ในระบบ</small><strong>{store.charges.length} <em>รายการ</em></strong><span>เรียกเก็บแล้ว {store.charges.filter((charge) => charge.status === 'PAID').length} รายการ</span></div></div><div className="flow-links"><button onClick={() => nav('charges')}><FileText size={16} />การเรียกเก็บ <ArrowUpRight size={14} /></button><button onClick={() => nav('payments')}><CreditCard size={16} />การรับชำระ <ArrowUpRight size={14} /></button></div></article><article className="content-panel"><div className="panel-heading"><div><h2>งานที่ต้องติดตาม</h2><p>สถานะธุรกรรมและงานบริการ</p></div><span className="task-count">{overdue.length + store.repairs.length}</span></div><button className="task-row" onClick={() => nav('charges')}><span className="task-icon task-red"><FileText size={16} /></span><span><strong>บิลเกินกำหนด</strong><small>{overdue.length} รายการ · ฿ {num(overdue.reduce((sum, item) => sum + item.amount, 0))}</small></span><span>›</span></button><button className="task-row" onClick={() => nav('repairs')}><span className="task-icon task-yellow"><Wrench size={16} /></span><span><strong>งานแจ้งซ่อม</strong><small>{store.repairs.length} รายการในระบบ</small></span><span>›</span></button><button className="task-row" onClick={() => nav('announcements')}><span className="task-icon task-blue"><MessageCircle size={16} /></span><span><strong>ประกาศ / LINE</strong><small>{store.announcements.length} ประกาศ</small></span><span>›</span></button></article></section><div className="role-note">มุมมอง{role} <span>·</span> ข้อมูลตัวอย่าง</div></> : <Module screen={screen} store={store} query={query} setQuery={setQuery} onEdit={(id) => { setEditId(id); setDialog(true) }} onDelete={(id) => removeRecord(screen, id)} user={user} />}
         <footer className="page-footer"><span>บ้านใจ · ระบบบริหารโครงการบ้านจัดสรร</span><span>ข้อมูลจัดเก็บในอุปกรณ์นี้</span></footer></div>
     </main>
     {inspectionData && <StoreInspectionDialog data={inspectionData} close={() => setInspectionData(null)} />}
@@ -514,7 +520,7 @@ type CommonFeeReportRow = {
   status: string
 }
 
-function ProjectReports({ store, view }: { store: Store; view: ReportView }) {
+function ProjectReports({ store, view, user }: { store: Store; view: ReportView; user: User }) {
   const now = new Date()
   const currentPeriod = `${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
   const [projectFilter, setProjectFilter] = useState('all')
@@ -583,8 +589,8 @@ function ProjectReports({ store, view }: { store: Store; view: ReportView }) {
 
   return <section className="project-report-print">
     {view === 'receivables' ? <OverdueReceivablesReport store={store} />
-    : view === 'invoices' ? <InvoiceListReport store={store} />
-    : view === 'payments-received' ? <PaymentsReceivedReport store={store} />
+    : view === 'invoices' ? <InvoiceListReport store={store} user={user} />
+    : view === 'payments-received' ? <PaymentsReceivedReport store={store} user={user} />
     : <>
     <header className="report-print-header"><h2>รายงานค่าส่วนกลางและสถานะรับชำระ</h2><p>{store.projects.find((project) => project.id === Number(projectFilter))?.project_name ?? 'ทุกโครงการ'} · รอบบิล {periodFilter}</p></header>
     <section className="water-filters report-filters no-print"><label>โครงการ<select value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}><option value="all">ทุกโครงการ</option>{store.projects.map((project) => <option key={project.id} value={project.id}>{project.project_code} · {project.project_name}</option>)}</select></label><label>รอบบิล<select value={periodFilter} onChange={(event) => setPeriodFilter(event.target.value)}>{periods.map((period) => <option value={period} key={period}>{period}</option>)}</select></label><label>สถานะ<select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">ทุกสถานะ</option>{Object.entries(statusLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><div className="report-actions"><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={15} />ส่งออก CSV</button><button className="secondary-button" onClick={() => window.print()}><Printer size={15} />พิมพ์รายงาน</button></div></section>
@@ -657,7 +663,7 @@ function OverdueReceivablesReport({ store }: { store: Store }) {
 
 type InvoiceReportRow = { charge: Charge; house?: House; member?: Member; project?: Project; issueDate: string; waterAmount: number; penalty: number; billedTotal: number; arrears: number; paid: number; balance: number }
 
-function InvoiceListReport({ store }: { store: Store }) {
+function InvoiceListReport({ store, user }: { store: Store; user: User }) {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [projectFilter, setProjectFilter] = useState('all')
@@ -696,6 +702,8 @@ function InvoiceListReport({ store }: { store: Store }) {
   const totalBalance = rows.reduce((sum, row) => sum + row.balance, 0)
   const projectName = store.projects.find((project) => project.id === Number(projectFilter))?.project_name ?? 'ทุกโครงการ'
   const rangeLabel = dateFrom || dateTo ? `${dateFrom || 'เริ่มต้น'} ถึง ${dateTo || 'ปัจจุบัน'}` : 'ทุกช่วงวันที่'
+  const printedBy = user.displayName || user.email || 'ผู้ใช้งาน'
+  const printedAt = new Intl.DateTimeFormat('th-TH', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date())
 
   function exportCsv() {
     const header = ['เลขที่ใบแจ้งหนี้', 'วันที่ออกบิล', 'วันครบกำหนด', 'โครงการ', 'บ้านเลขที่', 'แปลง', 'ลูกบ้าน', 'งวด', 'ค่าส่วนกลาง', 'ค่าน้ำ', 'ค่าปรับ', 'ยอดเรียกเก็บ', 'ยอดค้างเดิม', 'รับชำระแล้ว', 'คงค้าง', 'สถานะ']
@@ -710,7 +718,7 @@ function InvoiceListReport({ store }: { store: Store }) {
   }
 
   return <>
-    <header className="report-print-header"><h2>รายงานใบแจ้งหนี้</h2><p>{projectName} · {rangeLabel}</p></header>
+    <header className="report-print-header"><h2>รายงานใบแจ้งหนี้</h2><p>{projectName} · {rangeLabel}</p><p className="report-print-meta">พิมพ์โดย {printedBy} · วันที่พิมพ์ {printedAt}</p></header>
     <section className="water-filters report-filters no-print">
       <label>วันที่ออกบิลตั้งแต่<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
       <label>ถึงวันที่<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label>
@@ -727,7 +735,7 @@ function InvoiceListReport({ store }: { store: Store }) {
 
 type PaymentReportRow = { payment: Payment; house?: House; member?: Member; project?: Project; allocatedCharges: string }
 
-function PaymentsReceivedReport({ store }: { store: Store }) {
+function PaymentsReceivedReport({ store, user }: { store: Store; user: User }) {
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [projectFilter, setProjectFilter] = useState('all')
@@ -768,12 +776,43 @@ function PaymentsReceivedReport({ store }: { store: Store }) {
   const confirmedRows = rows.filter((row) => row.payment.status === 'CONFIRMED')
   const totalReceived = confirmedRows.reduce((sum, row) => sum + row.payment.amount, 0)
   const projectName = store.projects.find((project) => project.id === Number(projectFilter))?.project_name ?? 'ทุกโครงการ'
-  const rangeLabel = dateFrom || dateTo ? `${dateFrom || 'เริ่มต้น'} ถึง ${dateTo || 'ปัจจุบัน'}` : 'ทุกช่วงวันที่'
+  const printedBy = user.displayName || user.email || 'ผู้ใช้งาน'
+  const printedAt = new Intl.DateTimeFormat('th-TH', { day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' }).format(new Date())
+
+  const channelSum = (groupRows: PaymentReportRow[], code: string) => groupRows.filter((row) => row.payment.status === 'CONFIRMED' && row.payment.payment_method === code).reduce((sum, row) => sum + row.payment.amount, 0)
+  const groupTotal = (groupRows: PaymentReportRow[]) => groupRows.filter((row) => row.payment.status === 'CONFIRMED').reduce((sum, row) => sum + row.payment.amount, 0)
+
+  const dateGroups = Object.entries(
+    rows.reduce<Record<string, PaymentReportRow[]>>((groups, row) => {
+      const key = row.payment.payment_date
+      groups[key] = groups[key] ?? []
+      groups[key].push(row)
+      return groups
+    }, {})
+  ).sort(([left], [right]) => left.localeCompare(right))
 
   function exportCsv() {
-    const header = ['เลขที่ใบเสร็จ', 'วันที่รับชำระ', 'โครงการ', 'บ้านเลขที่', 'แปลง', 'ลูกบ้าน', 'ช่องทางชำระ', 'บัญชีธนาคาร', 'เลขอ้างอิง', 'จำนวนเงิน', 'สถานะ', 'ใบแจ้งหนี้ที่ตัดยอด']
-    const values = rows.map((row) => [row.payment.payment_no, row.payment.payment_date, row.project?.project_name ?? '', row.house?.house_no ?? '', row.house?.plot_no ?? '', person(row.member), row.payment.payment_method, row.payment.bank_account, row.payment.reference_no, row.payment.amount, getStatus(row.payment.status), row.allocatedCharges])
-    const csv = [header, ...values].map((record) => record.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n')
+    const header = ['เลขที่ใบเสร็จ', 'บ้านเลขที่', 'แปลง', 'ลูกบ้าน', ...PAYMENT_CHANNELS.map(([, label]) => label), 'รวม', 'บัญชี / อ้างอิง', 'สถานะ', 'ใบแจ้งหนี้ที่ตัดยอด']
+    const records: (string | number)[][] = []
+    dateGroups.forEach(([date, groupRows]) => {
+      records.push([`วันที่รับชำระ : ${thaiFullDate(date)}`, '', '', '', ...PAYMENT_CHANNELS.map(() => ''), '', '', '', ''])
+      groupRows.forEach((row) => {
+        records.push([
+          row.payment.payment_no,
+          row.house?.house_no ?? '',
+          row.house?.plot_no ?? '',
+          person(row.member),
+          ...PAYMENT_CHANNELS.map(([code]) => row.payment.status === 'CONFIRMED' && row.payment.payment_method === code ? row.payment.amount : ''),
+          row.payment.status === 'CONFIRMED' ? row.payment.amount : 0,
+          `${row.payment.bank_account || '-'}${row.payment.reference_no ? ` · อ้างอิง ${row.payment.reference_no}` : ''}`,
+          getStatus(row.payment.status),
+          row.allocatedCharges,
+        ])
+      })
+      records.push([`รวมวันที่ ${thaiFullDate(date)}`, '', '', '', ...PAYMENT_CHANNELS.map(([code]) => channelSum(groupRows, code)), groupTotal(groupRows), '', '', ''])
+    })
+    records.push(['รวมทั้งหมด', '', '', '', ...PAYMENT_CHANNELS.map(([code]) => channelSum(confirmedRows, code)), totalReceived, '', '', ''])
+    const csv = [header, ...records].map((record) => record.map((value) => `"${String(value ?? '').replaceAll('"', '""')}"`).join(',')).join('\r\n')
     const url = URL.createObjectURL(new Blob(['\uFEFF', csv], { type: 'text/csv;charset=utf-8' }))
     const link = document.createElement('a')
     link.href = url
@@ -783,7 +822,7 @@ function PaymentsReceivedReport({ store }: { store: Store }) {
   }
 
   return <>
-    <header className="report-print-header"><h2>รายงานรับชำระเงิน</h2><p>{projectName} · {rangeLabel}</p></header>
+    <header className="report-print-header"><h2>รายงานรับชำระเงิน</h2><p>{projectName} · จากวันที่ {dateFrom || 'เริ่มต้น'} ถึงวันที่ {dateTo || 'ปัจจุบัน'}</p><p className="report-print-meta">พิมพ์โดย {printedBy} · วันที่พิมพ์ {printedAt}</p></header>
     <section className="water-filters report-filters no-print">
       <label>วันที่รับชำระตั้งแต่<input type="date" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
       <label>ถึงวันที่<input type="date" value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label>
@@ -794,13 +833,22 @@ function PaymentsReceivedReport({ store }: { store: Store }) {
       <div className="report-actions"><button className="secondary-button" onClick={exportCsv}><ArrowDownToLine size={15} />ส่งออก CSV</button><button className="secondary-button" onClick={() => window.print()}><Printer size={15} />พิมพ์รายงาน</button></div>
     </section>
     <section className="summary-grid report-summary-grid"><article className="summary-card"><p>จำนวนรายการรับชำระ</p><strong>{confirmedRows.length}</strong></article><article className="summary-card"><p>ยอดรับชำระรวม</p><strong>฿ {formatMoney(totalReceived)}</strong></article></section>
-    <section className="module-panel"><div className="module-toolbar"><span>{rows.length} รายการ <small>· รายงานรับชำระเงิน</small></span></div><div className="records-table-wrap"><table className="records-table report-table"><thead><tr><th>เลขที่ใบเสร็จ</th><th>วันที่รับชำระ</th><th>บ้าน / แปลง</th><th>ลูกบ้าน</th><th>ช่องทางชำระ</th><th>บัญชีธนาคาร</th><th>เลขอ้างอิง</th><th>จำนวนเงิน</th><th>สถานะ</th><th>ใบแจ้งหนี้ที่ตัดยอด</th></tr></thead><tbody>{rows.map((row) => <tr key={row.payment.id}><td><strong>{row.payment.payment_no}</strong></td><td>{row.payment.payment_date}</td><td><strong>{row.house?.house_no ?? '-'}</strong><small className="date-cell">{row.house?.plot_no ?? ''}</small></td><td>{person(row.member)}</td><td>{row.payment.payment_method}</td><td>{row.payment.bank_account}</td><td>{row.payment.reference_no || '-'}</td><td><strong>฿ {formatMoney(row.payment.amount)}</strong></td><td><span className={`status-pill ${row.payment.status === 'CONFIRMED' ? 'status-good' : 'status-progress'}`}>{getStatus(row.payment.status)}</span></td><td>{row.allocatedCharges}</td></tr>)}{rows.length === 0 && <tr><td colSpan={10} className="empty-state">ไม่พบรายการในตัวกรองนี้</td></tr>}</tbody></table></div></section>
+    <section className="module-panel"><div className="module-toolbar"><span>{rows.length} รายการ <small>· รายงานรับชำระเงิน</small></span></div><div className="records-table-wrap"><table className="records-table report-table report-grouped-table"><thead><tr><th>เลขที่ใบเสร็จ</th><th>บ้าน / แปลง</th><th>ลูกบ้าน</th>{PAYMENT_CHANNELS.map(([code, label]) => <th key={code}>{label}</th>)}<th>รวม</th><th>บัญชี / อ้างอิง</th><th>สถานะ</th><th>ใบแจ้งหนี้ที่ตัดยอด</th></tr></thead><tbody>
+      {dateGroups.map(([date, groupRows]) => <Fragment key={date}>
+        <tr className="report-group-row"><td colSpan={9}>{thaiFullDate(date)}</td></tr>
+        {groupRows.map((row) => <tr key={row.payment.id}><td><strong>{row.payment.payment_no}</strong></td><td><strong>{row.house?.house_no ?? '-'}</strong><small className="date-cell">{row.house?.plot_no ?? ''}</small></td><td>{person(row.member)}</td>{PAYMENT_CHANNELS.map(([code]) => <td key={code}>{row.payment.status === 'CONFIRMED' && row.payment.payment_method === code ? `฿ ${formatMoney(row.payment.amount)}` : '-'}</td>)}<td><strong>฿ {formatMoney(row.payment.status === 'CONFIRMED' ? row.payment.amount : 0)}</strong></td><td>{row.payment.bank_account || '-'}{row.payment.reference_no ? ` · อ้างอิง ${row.payment.reference_no}` : ''}</td><td><span className={`status-pill ${row.payment.status === 'CONFIRMED' ? 'status-good' : 'status-progress'}`}>{getStatus(row.payment.status)}</span></td><td>{row.allocatedCharges}</td></tr>)}
+        <tr className="report-subtotal-row"><td colSpan={3}>รวมวันที่ {thaiFullDate(date)}</td>{PAYMENT_CHANNELS.map(([code]) => <td key={code}>฿ {formatMoney(channelSum(groupRows, code))}</td>)}<td><strong>฿ {formatMoney(groupTotal(groupRows))}</strong></td><td colSpan={3}></td></tr>
+      </Fragment>)}
+      {rows.length === 0 && <tr><td colSpan={9} className="empty-state">ไม่พบรายการในตัวกรองนี้</td></tr>}
+    </tbody>
+    {rows.length > 0 && <tfoot><tr className="report-grandtotal-row"><td colSpan={3}>รวมทั้งหมด</td>{PAYMENT_CHANNELS.map(([code]) => <td key={code}>฿ {formatMoney(channelSum(confirmedRows, code))}</td>)}<td><strong>฿ {formatMoney(totalReceived)}</strong></td><td colSpan={3}></td></tr></tfoot>}
+    </table></div></section>
   </>
 }
 
-function Module({ screen, store, query, setQuery, onEdit, onDelete }: { screen: ModuleScreen | 'water' | 'reports'; store: Store; query: string; setQuery: (value: string) => void; onEdit: (id: number) => void; onDelete: (id: number) => void }) {
+function Module({ screen, store, query, setQuery, onEdit, onDelete, user }: { screen: ModuleScreen | 'water' | 'reports'; store: Store; query: string; setQuery: (value: string) => void; onEdit: (id: number) => void; onDelete: (id: number) => void; user: User }) {
   const [printTarget, setPrintTarget] = useState<PrintTarget | null>(null)
-  if (screen === 'reports') return <ProjectReports store={store} view={reportNavItems.some((item) => item.view === query) ? (query as ReportView) : 'common-fees'} />
+  if (screen === 'reports') return <ProjectReports store={store} view={reportNavItems.some((item) => item.view === query) ? (query as ReportView) : 'common-fees'} user={user} />
   if (screen === 'water') return <WaterList store={store} />
   const houseFor = (id: number) => store.houses.find((house) => house.id === id)
   const memberFor = (id: number) => store.members.find((member) => member.id === id)
