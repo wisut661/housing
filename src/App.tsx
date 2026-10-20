@@ -9,7 +9,7 @@ type House = { id: number; project_id: number; house_code: string; house_no: str
 type Member = { id: number; member_code: string; title: string; first_name: string; last_name: string; phone: string; line_id: string; email: string; status: string; house_id?: number }
 type Rate = { id: number; project_id: number; amount: number; unit: string; effective_from: string; status: string }
 type Charge = { id: number; charge_no: string; project_id: number; rate_id: number; house_id: number; member_id: number; period: string; amount: number; water_amount?: number; water_previous_reading?: number; water_current_reading?: number; water_units?: number; penalty_amount?: number; issued_at?: string; due_date: string; status: string }
-type Payment = { id: number; payment_no: string; payment_date: string; member_id: number; house_id: number; charge_id: number; amount: number; payment_method: string; bank_account: string; reference_no: string; status: string }
+type Payment = { id: number; payment_no: string; payment_date: string; member_id: number; house_id: number; charge_id: number; amount: number; penalty_amount?: number; payment_method: string; bank_account: string; reference_no: string; status: string }
 type PaymentAllocation = { id: number; payment_id: number; charge_id: number; amount: number }
 type InvoiceBreakdown = { current: number; arrears: number; penalty: number; paid: number; totalDue: number }
 type Item = { id: number; title: string; detail: string; status: string; date: string; amount?: number }
@@ -960,13 +960,18 @@ function PrintDocument({ target, store, close }: { target: PrintTarget; store: S
   const dueDateLabel = charge ? new Intl.DateTimeFormat('th-TH', { day: '2-digit', month: 'long', year: 'numeric' }).format(new Date(`${charge.due_date}T00:00:00`)) : '-'
   const breakdown = charge ? invoiceBreakdown(store, charge) : undefined
   const allocations = payment ? store.paymentAllocations.filter((item) => item.payment_id === payment.id) : []
+  const paymentPenalty = payment?.penalty_amount ?? 0
+  let penaltyLeft = paymentPenalty
   const documentRows = payment
-    ? allocations.length > 0
+    ? [...(allocations.length > 0
       ? allocations.map((allocation) => {
           const allocatedCharge = store.charges.find((item) => item.id === allocation.charge_id)
-          return { id: allocation.id, label: allocatedCharge ? `ชำระบิล ${allocatedCharge.period} · ${allocatedCharge.charge_no}` : 'ชำระค่าส่วนกลาง', amount: allocation.amount }
+          const deducted = Math.min(penaltyLeft, allocation.amount)
+          penaltyLeft -= deducted
+          return { id: allocation.id, label: allocatedCharge ? `ชำระบิล ${allocatedCharge.period} · ${allocatedCharge.charge_no}` : 'ชำระค่าส่วนกลาง', amount: allocation.amount - deducted }
         })
-      : [{ id: payment.id, label: `รับชำระค่าส่วนกลางงวด ${charge?.period ?? '-'}`, amount: payment.amount }]
+      : [{ id: payment.id, label: `รับชำระค่าส่วนกลางงวด ${charge?.period ?? '-'}`, amount: payment.amount - paymentPenalty }]).filter((row) => row.amount > 0),
+      ...(paymentPenalty > 0 ? [{ id: 'penalty', label: 'ค่าปรับ', amount: paymentPenalty }] : [])]
     : charge
       ? [
           { id: 'current', label: `ค่าส่วนกลางงวด ${charge.period}`, amount: charge.amount },
@@ -1069,7 +1074,7 @@ function EntryDialog({ screen, store, editId, close, save }: { screen: ModuleScr
       const charge: Charge = { id: id(), charge_no: `INV${String(new Date().getFullYear() + 543).slice(-2)}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(next.charges.length + 1).padStart(4, '0')}`, project_id: Number(form.project_id), rate_id: Number(form.rate_id), house_id: Number(form.house_id), member_id: Number(form.member_id), period: form.period, amount: rate && house ? commonFeeForHouse(rate, house) : 0, water_amount: waterAmount, ...(project?.water_billing_mode === 'metered' ? { water_previous_reading: waterPreviousReading, water_current_reading: currentReading, water_units: waterUnits } : {}), issued_at: new Date().toISOString().slice(0, 10), due_date: form.due_date, status: 'UNPAID' }
       next.charges.unshift(charge)
     }
-    else if (screen === 'payments') { const chargeId = Number(form.charge_id); const charge = next.charges.find((item) => item.id === chargeId); if (!charge) { setError('ไม่พบใบแจ้งหนี้ที่เลือก'); return } const addedPenalty = Math.max(0, Number(form.penalty_amount) || 0); charge.penalty_amount = (charge.penalty_amount ?? 0) + addedPenalty; const outstandingBalance = chargeBalance(next, charge); const amount = Number(form.amount || outstandingBalance); if (outstandingBalance <= 0 || amount <= 0 || amount > outstandingBalance) { setError('ใบแจ้งหนี้นี้ไม่มียอดคงเหลือ หรือยอดรับชำระเกินยอดคงเหลือ'); return } const paymentId = id(); const unallocated = allocatePayment(next, paymentId, amount, charge); if (unallocated > 0.009) { setError('ไม่สามารถจัดสรรยอดรับชำระได้ครบ'); return } next.payments.unshift({ id: paymentId, payment_no: `RC${String(new Date().getFullYear() + 543).slice(-2)}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(next.payments.length + 1).padStart(4, '0')}`, payment_date: form.payment_date, member_id: Number(form.member_id), house_id: Number(form.house_id), charge_id: chargeId, amount, payment_method: form.payment_method, bank_account: form.bank_account, reference_no: form.reference_no, status: 'CONFIRMED' }) }
+    else if (screen === 'payments') { const chargeId = Number(form.charge_id); const charge = next.charges.find((item) => item.id === chargeId); if (!charge) { setError('ไม่พบใบแจ้งหนี้ที่เลือก'); return } const addedPenalty = Math.max(0, Number(form.penalty_amount) || 0); charge.penalty_amount = (charge.penalty_amount ?? 0) + addedPenalty; const outstandingBalance = chargeBalance(next, charge); const amount = Number(form.amount || outstandingBalance); if (outstandingBalance <= 0 || amount <= 0 || amount > outstandingBalance) { setError('ใบแจ้งหนี้นี้ไม่มียอดคงเหลือ หรือยอดรับชำระเกินยอดคงเหลือ'); return } const paymentId = id(); const unallocated = allocatePayment(next, paymentId, amount, charge); if (unallocated > 0.009) { setError('ไม่สามารถจัดสรรยอดรับชำระได้ครบ'); return } next.payments.unshift({ id: paymentId, payment_no: `RC${String(new Date().getFullYear() + 543).slice(-2)}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(next.payments.length + 1).padStart(4, '0')}`, payment_date: form.payment_date, member_id: Number(form.member_id), house_id: Number(form.house_id), charge_id: chargeId, amount, ...(addedPenalty > 0 ? { penalty_amount: addedPenalty } : {}), payment_method: form.payment_method, bank_account: form.bank_account, reference_no: form.reference_no, status: 'CONFIRMED' }) }
     else { const list = next[screen] as Item[]; list.unshift({ id: id(), title: form.name, detail: form.detail, status: screen === 'repairs' ? 'รับเรื่องแล้ว' : screen === 'announcements' ? 'ร่าง' : 'รายการใหม่', date: form.created_at, ...(form.amount ? { amount: Number(form.amount) } : {}) }) }
     save(next)
   }
