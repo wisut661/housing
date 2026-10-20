@@ -332,3 +332,4 @@
 .bulk-preview-row, .form-hint { font-size: 11px; }
 .record-modal input, .record-modal select { font-size: 13px; }
 .toast { font-size: 13px; }
+.document-remark { margin-top: 6mm; font-size: 10pt; white-space: pre-wrap; }
